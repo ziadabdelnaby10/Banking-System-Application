@@ -254,3 +254,97 @@ Use these todo IDs/titles/descriptions in your tracker:
 
 **Dependency chain:**  
 `architecture-foundation` → `identity-access` → (`master-data`, `frontend-erp-shell`) → `customer-account` → `transaction-ledger` → `maker-checker` → (`audit-compliance`, `frontend-business-screens`) → `reporting-module` → `integration-hardening`
+
+---
+
+## 10) Sequence Diagrams
+
+### 10.1 Login with MFA
+
+```mermaid
+sequenceDiagram
+   autonumber
+   actor User
+   participant UI as Frontend SPA
+   participant Auth as Auth API
+   participant MFA as MFA Service
+   participant Tokens as Token Service
+   participant Audit as Audit Log
+
+   User->>UI: Enter username and password
+   UI->>Auth: Submit credentials
+   Auth->>Auth: Validate password hash and status
+   Auth->>MFA: Create MFA challenge if required
+   MFA-->>User: Deliver OTP / push challenge
+   User->>UI: Submit MFA code
+   UI->>Auth: Submit MFA response
+   Auth->>MFA: Verify challenge
+   Auth->>Tokens: Issue access and refresh tokens
+   Auth->>Audit: Record login success or failure
+   Auth-->>UI: Return session tokens and user context
+```
+
+### 10.2 High-Value Transfer with Maker-Checker
+
+```mermaid
+sequenceDiagram
+   autonumber
+   actor Maker
+   actor Checker
+   participant UI as Frontend SPA
+   participant Transfer as Transfer API
+   participant RBAC as Auth / RBAC
+   participant Accounts as Account Service
+   participant Risk as Validation Rules
+   participant Approval as Approval Service
+   participant Ledger as Ledger Service
+   participant Outbox as Outbox
+   participant Audit as Audit Log
+
+   Maker->>UI: Enter transfer details
+   UI->>Transfer: Submit transfer request with idempotency key
+   Transfer->>RBAC: Verify permission and branch scope
+   Transfer->>Accounts: Validate account status and ownership
+   Transfer->>Risk: Validate limits, currency, and compliance hooks
+   Transfer->>Approval: Create pending approval request
+   Approval->>Audit: Record maker action
+   Approval-->>UI: Return pending approval status
+
+   Checker->>UI: Open approval inbox
+   UI->>Approval: Request approval details
+   Approval->>Transfer: Load request context and impact summary
+   Checker->>UI: Approve or reject with reason
+   UI->>Approval: Submit decision
+   Approval->>Transfer: If approved, continue posting
+   Transfer->>Ledger: Create double-entry ledger rows
+   Transfer->>Accounts: Update balances atomically
+   Transfer->>Outbox: Publish transaction event
+   Transfer->>Audit: Record approval and posting outcome
+   Transfer-->>UI: Return final status
+```
+
+### 10.3 Account Freeze Flow
+
+```mermaid
+sequenceDiagram
+   autonumber
+   actor Officer as Compliance / Admin
+   actor Checker
+   participant UI as Frontend SPA
+   participant Account as Account API
+   participant RBAC as Auth / RBAC
+   participant Approval as Approval Service
+   participant Accounts as Account Service
+   participant Audit as Audit Log
+
+   Officer->>UI: Request account freeze
+   UI->>Account: Submit freeze request
+   Account->>RBAC: Verify privileged permission
+   Account->>Approval: Create approval record if required
+   Checker->>UI: Review freeze request
+   UI->>Approval: Submit decision
+   Approval->>Account: Approve freeze
+   Account->>Accounts: Update account status to frozen
+   Account->>Audit: Record action
+   Account-->>UI: Return completed status
+```

@@ -1,0 +1,138 @@
+project:
+  name: Banking System App Backend
+  description: Backend backlog seed for GitHub Projects, issues, and tasks.
+  type: software
+
+fields:
+  status_values: [Backlog, Ready, In Progress, In Review, Done]
+  priority_values: [P0, P1, P2]
+
+issues:
+  - id: architecture-foundation
+    title: Create architecture foundation and module boundaries
+    type: epic
+    priority: P0
+    labels: [backend, architecture, foundation]
+    depends_on: []
+    summary: Set up modular monolith package boundaries, shared conventions, and the initial observability baseline.
+    acceptance:
+      - Domain packages are defined for customer, account, transaction, ledger, approval, auth, audit, and reporting.
+      - Shared error handling, logging, and correlation IDs are established.
+
+  - id: identity-access
+    title: Implement JWT, MFA, RBAC, and branch scoping
+    type: epic
+    priority: P0
+    labels: [backend, security, identity]
+    depends_on: [architecture-foundation]
+    summary: Build the authentication and authorization layer for all secured APIs.
+    acceptance:
+      - Access and refresh tokens are issued and validated.
+      - MFA is enforced for privileged actions.
+      - Branch-scoped permissions are enforced server-side.
+
+  - id: master-data
+    title: Build branches, roles, permissions, and user management
+    type: epic
+    priority: P1
+    labels: [backend, master-data, admin]
+    depends_on: [identity-access]
+    summary: Provide admin APIs and persistence for branches, users, roles, and permission mappings.
+    acceptance:
+      - Branch CRUD is available to authorized admins.
+      - Role and permission mapping APIs exist.
+      - User lifecycle actions are audited.
+
+  - id: customer-account
+    title: Implement customer onboarding and account lifecycle
+    type: epic
+    priority: P0
+    labels: [backend, customer, account]
+    depends_on: [master-data]
+    summary: Support customer creation, KYC status tracking, and account opening/maintenance.
+    acceptance:
+      - Customer onboarding records KYC status and branch assignment.
+      - Account opening validates customer and branch constraints.
+      - Freeze and close actions are permissioned and audited.
+
+  - id: transaction-ledger
+    title: Build transfers and payments with double-entry posting
+    type: epic
+    priority: P0
+    labels: [backend, ledger, transaction]
+    depends_on: [customer-account]
+    summary: Implement transfer execution, ledger posting, and balance updates with strong consistency.
+    acceptance:
+      - Idempotency keys are enforced.
+      - Double-entry ledger rows are written for every posted financial operation.
+      - Balance mutations occur only inside transactional posting flows.
+
+  - id: maker-checker
+    title: Implement approval workflows for critical operations
+    type: epic
+    priority: P0
+    labels: [backend, approval, governance]
+    depends_on: [transaction-ledger]
+    summary: Add maker-checker routing for high-risk transfers, freeze actions, and role changes.
+    acceptance:
+      - Pending approval states are supported.
+      - Checker decisions require a reason.
+      - Approval outcomes are auditable and traceable.
+
+  - id: audit-compliance
+    title: Build immutable audit logs and compliance queries
+    type: epic
+    priority: P0
+    labels: [backend, audit, compliance]
+    depends_on: [maker-checker]
+    summary: Store immutable audit events and expose query APIs for investigations.
+    acceptance:
+      - Audit events capture actor, action, entity, correlation ID, and payload.
+      - Compliance users can search by actor, entity, and time range.
+      - Audit records are append-only.
+
+  - id: reporting-module
+    title: Implement operational and financial reporting exports
+    type: epic
+    priority: P1
+    labels: [backend, reporting, export]
+    depends_on: [audit-compliance]
+    summary: Provide report generation and CSV/PDF export endpoints for permitted roles.
+    acceptance:
+      - Reporting queries aggregate transactional and ledger data.
+      - Export jobs are permission-checked.
+      - Large exports are handled asynchronously or in chunks.
+
+  - id: frontend-erp-shell
+    title: Prepare backend contracts for SPA shell integration
+    type: task
+    priority: P1
+    labels: [backend, frontend-contract, api]
+    depends_on: [identity-access, master-data]
+    summary: Support frontend navigation, role guards, and reference data APIs.
+    acceptance:
+      - API contracts are versioned.
+      - Reference data endpoints are cached and permission-aware.
+
+  - id: frontend-business-screens
+    title: Prepare backend endpoints for customer, account, transaction, approval, and audit screens
+    type: task
+    priority: P1
+    labels: [backend, frontend-contract, api]
+    depends_on: [audit-compliance]
+    summary: Expose the APIs required by the ERP-style business screens.
+    acceptance:
+      - List/detail endpoints support pagination and filtering.
+      - Problem+JSON errors are returned consistently.
+
+  - id: integration-hardening
+    title: End-to-end integration, security, and performance hardening
+    type: epic
+    priority: P0
+    labels: [backend, hardening, testing]
+    depends_on: [reporting-module, frontend-business-screens]
+    summary: Complete testing, observability, and runtime hardening before production readiness.
+    acceptance:
+      - Testcontainers-based integration tests pass.
+      - Security and role-boundary tests are in place.
+      - Performance and observability checks are documented.
