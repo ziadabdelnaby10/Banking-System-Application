@@ -1,45 +1,47 @@
-**Outcome:** Detailed plan for a **Core Banking + ERP-lite** app (Spring Boot backend + separate SPA frontend), including AI instructions, use cases, user stories, DB schema, and app flow.
+**Outcome:** Detailed plan for a **Core Banking + ERP-lite** app (Spring Boot microservices + separate SPA frontend), including AI instructions, use cases, user stories, DB schema, and app flow.
 
 ## 1) Problem & Approach
 
 Build a banking operations platform with a classic ERP-style UI, supporting high operational scale (target: ~100K users), strong governance (RBAC, 2FA, maker-checker), and full auditability.  
-Architecture: **modular monolith first** (Spring Boot) with clean module boundaries, event/outbox for future microservice split, and SPA frontend consuming secured REST APIs.
+Architecture: **microservices-first** (Spring Boot services behind an API gateway), with domain-aligned service boundaries, Kafka/RabbitMQ for async events, outbox-based reliability, and a SPA frontend consuming secured REST APIs.
 
 ---
 
 ## 2) Detailed AI Instructions
 
-### Backend AI Instructions (Spring Boot)
+### Backend AI Instructions (Spring Boot Microservices)
 
-**Role:** You are a senior backend engineer building a secure banking core.
+**Role:** You are a senior backend engineer building a secure banking core as a distributed system.
 
 **Tech Stack**
 1. Java 21, Spring Boot 3.x
 2. Spring Web, Spring Security, Spring Data JPA, Validation
-3. PostgreSQL
-4. Redis (caching, rate limiting, session adjuncts)
-5. Kafka/Rabbit optional for async events
-6. Flyway for DB migrations
-7. OpenAPI/Swagger
-8. JUnit + Testcontainers
+3. PostgreSQL per service (or per bounded context), Redis for cache/rate limiting
+4. Kafka/RabbitMQ for event-driven integration
+5. Flyway for DB migrations per service
+6. API Gateway (Spring Cloud Gateway or Kong/NGINX)
+7. Service discovery / config (Spring Cloud / Consul / Eureka / Kubernetes native)
+8. OpenAPI/Swagger
+9. JUnit + Testcontainers
 
 **Architecture Rules**
-1. Use **modular monolith** packages by domain: `customer`, `account`, `transaction`, `ledger`, `approval`, `auth`, `audit`, `reporting`.
-2. Enforce domain boundaries (no direct cross-module DB access except via explicit service contracts).
-3. Use **hexagonal-ish layering**:
+1. Use **microservices** by bounded context: `gateway`, `identity`, `customer`, `account`, `transaction`, `ledger`, `approval`, `notification`, `reporting`, `audit`.
+2. Each service owns its database schema and business logic; do not read/write another service's database directly.
+3. Prefer explicit contracts via REST, async events, and message contracts.
+4. Use **hexagonal-ish layering** inside each service:
    - API (controllers, DTOs)
    - Application services (use-cases)
    - Domain (entities, rules)
    - Infrastructure (repositories, messaging, integrations)
 
 **Security & Compliance**
-1. JWT access + refresh tokens.
+1. JWT access + refresh tokens issued by `identity` and validated at the gateway and service boundaries.
 2. Mandatory 2FA for privileged actions.
-3. RBAC + branch scoping + functional permissions.
+3. RBAC + branch scoping + functional permissions enforced in each service and validated via claims/authorization metadata.
 4. Maker-checker workflow for critical operations (large transfer, account freeze, role change).
 5. Immutable audit log for all CRUD + approvals + auth events.
 6. Data encryption:
-   - In transit: TLS
+   - In transit: TLS between clients, gateway, services, and brokers
    - At rest: DB-level encryption for sensitive fields (PII/account identifiers where needed)
 7. Add rate limits and lockout policy on auth endpoints.
 
@@ -48,25 +50,28 @@ Architecture: **modular monolith first** (Spring Boot) with clean module boundar
 2. No balance mutation without corresponding ledger posting.
 3. Idempotency key on transfer/payment APIs.
 4. Strong validation: currency consistency, account status checks, daily limits, AML flags hook.
-5. Use DB transactions with explicit isolation where needed.
+5. Use DB transactions within a service; for cross-service workflows use orchestration/Saga patterns and outbox events.
 
 **Reliability & Performance**
 1. P95 API latency target for common reads < 300ms (local/dev baseline friendly).
-2. Use optimistic locking for concurrent account operations.
+2. Use optimistic locking for concurrent account operations within a service.
 3. Add outbox pattern for publishing domain events.
-4. Caching for hot reads (customer/account snapshots) with safe invalidation.
+4. Cache hot reads (customer/account snapshots) with safe invalidation.
+5. Use circuit breakers, retries, and timeouts between services.
 
 **API Standards**
 1. Versioned REST APIs: `/api/v1/...`
 2. Problem+JSON error responses with machine-readable codes.
 3. Pagination/filter/sort for list endpoints.
 4. Correlation ID propagated in logs and response headers.
+5. All service-to-service communication should be resilient and traceable with observability metadata.
 
 **Testing**
 1. Unit tests for domain rules.
 2. Integration tests with Testcontainers for DB-backed use-cases.
 3. Security tests for role/permission boundaries.
 4. Contract tests for critical API responses.
+5. Event-driven integration tests for outbox and message handling.
 
 ---
 
@@ -158,76 +163,77 @@ Architecture: **modular monolith first** (Spring Boot) with clean module boundar
 
 ## 5) Database Schema (High-Level)
 
-**Core Tables**
-1. `users` (id, username, email, password_hash, status, mfa_enabled, last_login_at)
-2. `roles` (id, name, description)
-3. `permissions` (id, code, description)
-4. `user_roles` (user_id, role_id)
-5. `role_permissions` (role_id, permission_id)
-6. `branches` (id, code, name, region, status)
-7. `customers` (id, customer_no, full_name, dob, national_id, risk_level, kyc_status, branch_id)
-8. `accounts` (id, account_no, customer_id, product_type, currency, status, available_balance, ledger_balance, branch_id, opened_at)
-9. `transactions` (id, txn_ref, txn_type, amount, currency, from_account_id, to_account_id, status, idempotency_key, created_by, created_at)
-10. `ledger_entries` (id, txn_id, account_id, entry_type[DEBIT/CREDIT], amount, currency, posted_at)
-11. `approvals` (id, entity_type, entity_id, action, maker_id, checker_id, status, reason, created_at, decided_at)
-12. `audit_logs` (id, actor_id, action, entity_type, entity_id, payload_json, ip_address, correlation_id, created_at)
-13. `mfa_challenges` (id, user_id, method, code_hash, expires_at, verified_at)
-14. `sessions` (id, user_id, refresh_token_hash, expires_at, revoked_at)
+Each service owns its own database schema, with data integration through event-driven contracts.
+
+**Core Service Databases**
+1. `identity-db`: `users`, `roles`, `permissions`, `sessions`, `mfa_challenges`
+2. `customer-db`: `customers`, `branches`, `kyc_records`
+3. `account-db`: `accounts`, `account_products`, `account_status_history`
+4. `transaction-db`: `transactions`, `payment_requests`, `idempotency_keys`
+5. `ledger-db`: `ledger_entries`, `balances`, `journal_batches`
+6. `approval-db`: `approvals`, `approval_policies`, `approval_tasks`
+7. `audit-db`: `audit_logs`, `event_store`
+8. `reporting-db`: `report_jobs`, `aggregated_metrics`
+
+**Shared Cross-Cutting Tables / Contracts**
+1. `outbox_events` (in each producer service) for reliable event publication
+2. `consumer_offsets` / CDC tracking for replay and event consumption
+3. `correlation_id` propagated across all service calls and events
 
 **Indexes/Constraints**
 1. Unique: `customer_no`, `account_no`, `txn_ref`, `idempotency_key`
-2. FK constraints on all relations
+2. FK constraints on all relations within each service database
 3. Indexes: `accounts(customer_id,status)`, `transactions(created_at,status)`, `approvals(status,created_at)`, `audit_logs(entity_type,entity_id,created_at)`
 
 ---
 
 ## 6) App Flow (End-to-End)
 
-1. **Login Flow**
-   - User submits credentials → backend validates.
-   - If MFA required, issue challenge.
-   - User submits OTP → receive JWT access/refresh tokens.
+1. **Gateway / Identity Flow**
+   - Client calls API Gateway → token validation and routing.
+   - `identity` service issues/validates JWTs and MFA challenges.
 2. **Operational Flow (Maker)**
-   - Maker creates transaction request (e.g., high-value transfer).
-   - System validates limits/status/rules.
-   - If critical, set status `PENDING_APPROVAL`, create approval record.
+   - `customer` and `account` services validate customer/account state.
+   - `transaction` service creates a pending payment or transfer request.
+   - If critical, it emits a `payment_requested` event and creates an approval task in `approval`.
 3. **Approval Flow (Checker)**
-   - Checker opens approval inbox.
-   - Reviews context + account impact.
-   - Approves/rejects with mandatory reason.
+   - `approval` service exposes inbox and decision APIs.
+   - Checker reviews context, account impact, and risk metadata.
+   - Approves/rejects with mandatory reason and writes to immutable audit stream.
 4. **Posting Flow**
-   - On approval, execute atomic posting:
-     - Create transaction record
-     - Create double-entry ledger rows
-     - Update account balances
-     - Emit outbox event
+   - On approval, `transaction` service triggers ledger posting.
+   - `ledger` service writes double-entry postings and updates balances.
+   - `account` service consumes events and updates account state if needed.
+   - Outbox event is emitted for downstream notifications/reporting.
 5. **Audit Flow**
-   - Every significant action writes immutable audit record.
-   - Compliance can query by actor/entity/date/correlation ID.
+   - Every service writes immutable audit records and emits domain events.
+   - `audit` service stores append-only event data for compliance and investigations.
 6. **Reporting Flow**
-   - Reporting module aggregates transactions/ledger/activity.
-   - User exports CSV/PDF by permission.
+   - `reporting` service aggregates ledger/transaction/audit events.
+   - Users export CSV/PDF by permission via asynchronous jobs and status tracking.
 
 ---
 
-## 7) Suggested Modules (Implementation Plan Structure)
+## 7) Suggested Service Boundaries (Implementation Plan Structure)
 
-1. Foundation: project setup, auth skeleton, observability baseline
-2. Identity & Access: JWT, MFA, RBAC, branch scoping
-3. Master Data: branches, users, roles, products
-4. Customer & Account Management
-5. Transactions + ledger engine (double-entry)
-6. Maker-checker approval engine
-7. Audit & compliance explorer
-8. Reporting & exports
-9. Frontend ERP screens and integration
-10. Hardening: performance, security tests, reliability checks
+1. Foundation: API gateway, service discovery, shared contracts, observability baseline
+2. Identity & Access: JWT, MFA, RBAC, branch scoping, session management
+3. Customer & Master Data: branches, customers, KYC, roles, permissions
+4. Account Management: savings/current accounts, lifecycle, limits, freeze/close
+5. Transaction & Payment Engine: transfer execution, idempotency, validation
+6. Ledger & Posting: double-entry journal posting, balance reconciliation
+7. Approval & Governance: maker-checker, risk review, policy enforcement
+8. Notification & Messaging: email/SMS/customer alerts, webhook integration
+9. Audit & Compliance: immutable audit logs, searchable event store
+10. Reporting & Exports: operational/financial reporting and CSV/PDF jobs
+11. Frontend ERP shell and business screens
+12. Hardening: resilience, security tests, performance, tracing, chaos checks
 
 ---
 
 ## 8) ADRs to Create Early
 
-1. ADR-001: Modular Monolith vs Microservices
+1. ADR-001: Microservices-First Architecture
 2. ADR-002: PostgreSQL + Redis choice
 3. ADR-003: JWT + MFA + RBAC security model
 4. ADR-004: Double-entry ledger design
@@ -240,9 +246,9 @@ Architecture: **modular monolith first** (Spring Boot) with clean module boundar
 
 Use these todo IDs/titles/descriptions in your tracker:
 
-1. `architecture-foundation` — Creating architecture foundation and module boundaries  
+1. `service-foundation` — Creating shared gateway, service skeletons, and contract standards  
 2. `identity-access` — Implementing JWT, MFA, RBAC, and branch scoping  
-3. `master-data` — Building branches, roles, permissions, and user management  
+3. `master-data` — Building branches, roles, permissions, and customer master data  
 4. `customer-account` — Implementing customer onboarding and account lifecycle  
 5. `transaction-ledger` — Building transfers/payments with double-entry posting  
 6. `maker-checker` — Implementing approval workflows for critical operations  
@@ -250,101 +256,11 @@ Use these todo IDs/titles/descriptions in your tracker:
 8. `reporting-module` — Implementing operational/financial reporting exports  
 9. `frontend-erp-shell` — Building SPA shell, navigation, and role-based routing  
 10. `frontend-business-screens` — Implementing customer/account/transaction/approval/audit screens  
-11. `integration-hardening` — End-to-end integration, security, and performance hardening
+11. `integration-hardening` — End-to-end integration, security, and performance hardening  
 
 **Dependency chain:**  
-`architecture-foundation` → `identity-access` → (`master-data`, `frontend-erp-shell`) → `customer-account` → `transaction-ledger` → `maker-checker` → (`audit-compliance`, `frontend-business-screens`) → `reporting-module` → `integration-hardening`
+`service-foundation` → `identity-access` → (`master-data`, `frontend-erp-shell`) → `customer-account` → `transaction-ledger` → `maker-checker` → (`audit-compliance`, `frontend-business-screens`) → `reporting-module` → `integration-hardening`
 
 ---
 
 ## 10) Sequence Diagrams
-
-### 10.1 Login with MFA
-
-```mermaid
-sequenceDiagram
-   autonumber
-   actor User
-   participant UI as Frontend SPA
-   participant Auth as Auth API
-   participant MFA as MFA Service
-   participant Tokens as Token Service
-   participant Audit as Audit Log
-
-   User->>UI: Enter username and password
-   UI->>Auth: Submit credentials
-   Auth->>Auth: Validate password hash and status
-   Auth->>MFA: Create MFA challenge if required
-   MFA-->>User: Deliver OTP / push challenge
-   User->>UI: Submit MFA code
-   UI->>Auth: Submit MFA response
-   Auth->>MFA: Verify challenge
-   Auth->>Tokens: Issue access and refresh tokens
-   Auth->>Audit: Record login success or failure
-   Auth-->>UI: Return session tokens and user context
-```
-
-### 10.2 High-Value Transfer with Maker-Checker
-
-```mermaid
-sequenceDiagram
-   autonumber
-   actor Maker
-   actor Checker
-   participant UI as Frontend SPA
-   participant Transfer as Transfer API
-   participant RBAC as Auth / RBAC
-   participant Accounts as Account Service
-   participant Risk as Validation Rules
-   participant Approval as Approval Service
-   participant Ledger as Ledger Service
-   participant Outbox as Outbox
-   participant Audit as Audit Log
-
-   Maker->>UI: Enter transfer details
-   UI->>Transfer: Submit transfer request with idempotency key
-   Transfer->>RBAC: Verify permission and branch scope
-   Transfer->>Accounts: Validate account status and ownership
-   Transfer->>Risk: Validate limits, currency, and compliance hooks
-   Transfer->>Approval: Create pending approval request
-   Approval->>Audit: Record maker action
-   Approval-->>UI: Return pending approval status
-
-   Checker->>UI: Open approval inbox
-   UI->>Approval: Request approval details
-   Approval->>Transfer: Load request context and impact summary
-   Checker->>UI: Approve or reject with reason
-   UI->>Approval: Submit decision
-   Approval->>Transfer: If approved, continue posting
-   Transfer->>Ledger: Create double-entry ledger rows
-   Transfer->>Accounts: Update balances atomically
-   Transfer->>Outbox: Publish transaction event
-   Transfer->>Audit: Record approval and posting outcome
-   Transfer-->>UI: Return final status
-```
-
-### 10.3 Account Freeze Flow
-
-```mermaid
-sequenceDiagram
-   autonumber
-   actor Officer as Compliance / Admin
-   actor Checker
-   participant UI as Frontend SPA
-   participant Account as Account API
-   participant RBAC as Auth / RBAC
-   participant Approval as Approval Service
-   participant Accounts as Account Service
-   participant Audit as Audit Log
-
-   Officer->>UI: Request account freeze
-   UI->>Account: Submit freeze request
-   Account->>RBAC: Verify privileged permission
-   Account->>Approval: Create approval record if required
-   Checker->>UI: Review freeze request
-   UI->>Approval: Submit decision
-   Approval->>Account: Approve freeze
-   Account->>Accounts: Update account status to frozen
-   Account->>Audit: Record action
-   Account-->>UI: Return completed status
-```

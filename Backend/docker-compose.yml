@@ -1,38 +1,98 @@
-services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: banking-postgres
-    restart: unless-stopped
+services: # Top-level key defining the services in this compose file
+  postgres: # PostgreSQL service (system of record for the app)
+    image: postgres:16-alpine # lightweight Postgres image for dev
+    container_name: banking-postgres # container name for easier reference
+    restart: unless-stopped # restart policy
     ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-banking_app}
-      POSTGRES_USER: ${POSTGRES_USER:-banking_app}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-banking_app_password}
-      TZ: UTC
+      - "5432:5432" # expose Postgres port to host for local connections
+    environment: # environment variables for Postgres configuration
+      POSTGRES_DB: ${POSTGRES_DB:-banking_app} # database name (from .env or default)
+      POSTGRES_USER: ${POSTGRES_USER:-banking_app} # DB user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-banking_app_password} # DB password
+      TZ: UTC # set timezone
+    command: > # additional Postgres runtime options
+      postgres
+      -c shared_preload_libraries=pg_stat_statements # enable stats extension
+      -c max_connections=300 # allow more concurrent connections in dev
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
+      - postgres_data:/var/lib/postgresql/data # persist DB files in a named volume
+      - ./infra/db/init:/docker-entrypoint-initdb.d:ro # run init scripts on startup
+    networks:
+      - backend_network # connect to the backend network for inter-service communication
+    healthcheck: # container healthcheck for orchestration
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-banking_app} -d ${POSTGRES_DB:-banking_app}"]
       interval: 10s
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7.2-alpine
-    container_name: banking-redis
-    restart: unless-stopped
+  redis: # Redis service for caching and support features
+    image: redis:7.2-alpine # lightweight Redis image
+    container_name: banking-redis # container name for easier reference
+    restart: unless-stopped # restart policy
     ports:
-      - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-banking_redis_password}"]
+      - "6379:6379" # expose Redis port to host
+    command: ["redis-server", "--maxmemory" , "256mb", "--maxmemory-policy", "allkeys-lru", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-banking_redis_password}"] # enable AOF persistence and set password
     volumes:
-      - redis_data:/data
-    healthcheck:
+      - redis_data:/data # persist Redis data
+    networks:
+      - backend_network # connect to the backend network for inter-service communication
+    healthcheck: # healthcheck to ensure Redis is responsive
       test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-banking_redis_password} ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 10
 
-volumes:
-  postgres_data:
-  redis_data:
+  kafka: # Confluent Kafka running in KRaft (no Zookeeper) for eventing
+    image: confluentinc/cp-kafka:7.4.0 # Confluent Platform image (KRaft capable)
+    container_name: banking-kafka # container name for easier reference
+    restart: unless-stopped # restart policy
+    ports:
+      - "9092:9092" # bootstrap server port exposed to host
+    environment: # Kafka / KRaft environment variables
+      CLUSTER_ID: "WnLkTHhkQaiJbwP8FClPhw"
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller # run both broker and controller roles in same process (KRaft)
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9091 # controller quorum voters (single-node dev setup)
+      KAFKA_LISTENERS: PLAINTEXT://:9090,CONTROLLER://:9091,EXTERNAL://:9092 # listeners for clients and controller
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9090,EXTERNAL://localhost:9092 # advertised address for clients
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER # controller listener name
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT # inter-broker protocol listener
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      # KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true" # convenient for dev (auto-create topics)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # replication factor for internal topics
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1 # replication for transaction log
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1 # min ISR for transaction log
+      KAFKA_LOG_RETENTION_HOURS: 168 # default log retention (in hours)
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0 # speed up consumer group rebalances in dev
+      CONFLUENT_SUPPORT_METRICS_ENABLE: "false" # disable Confluent metrics reporting in dev
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - backend_network # connect to the backend network for inter-service communication
+    healthcheck: # ensure Kafka is responding to admin calls
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  mailhog: # MailHog for capturing sent emails in local development
+    image: mailhog/mailhog:latest # MailHog image
+    container_name: banking-mailhog # container name for easier reference
+    restart: unless-stopped # restart policy
+    ports:
+      - "1025:1025" # SMTP port for apps to send mail to
+      - "8025:8025" # HTTP UI port to view captured emails
+    healthcheck: # check SMTP port is open
+      test: ["CMD-SHELL", "nc -z localhost 1025 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes: # Named volumes used by services
+  postgres_data: # Postgres data persistence volume
+  redis_data: # Redis data persistence volume
+  kafka_data: # Kafka data persistence volume
+
+networks:
+  backend_network: # custom network for backend services
+    driver: bridge # use bridge driver for inter-container communication
