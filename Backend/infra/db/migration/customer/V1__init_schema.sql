@@ -4,6 +4,7 @@ create table if not exists branches (
     name varchar(150) not null,
     region varchar(100),
     status varchar(20) not null default 'ACTIVE',
+    correlation_id varchar(64),
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     constraint branches_status_chk check (status in ('ACTIVE', 'INACTIVE'))
@@ -18,6 +19,7 @@ create table if not exists customers (
     risk_level varchar(20) not null default 'LOW',
     kyc_status varchar(20) not null default 'PENDING',
     branch_id bigint not null,
+    correlation_id varchar(64) not null,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     constraint customers_risk_chk check (risk_level in ('LOW', 'MEDIUM', 'HIGH')),
@@ -33,12 +35,15 @@ create table if not exists kyc_records (
     reviewed_by varchar(120),
     reviewed_at timestamptz,
     notes text,
+    correlation_id varchar(64) not null,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
 
 create index if not exists customers_branch_status_idx on customers (branch_id, kyc_status);
+create index if not exists customers_correlation_idx on customers (correlation_id);
 create index if not exists kyc_records_customer_status_idx on kyc_records (customer_id, status);
+create index if not exists kyc_records_correlation_idx on kyc_records (correlation_id);
 
 create or replace function set_updated_at()
 returns trigger

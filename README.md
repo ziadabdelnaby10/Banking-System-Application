@@ -1,5 +1,11 @@
 **Outcome:** Detailed plan for a **Core Banking + ERP-lite** app (Spring Boot microservices + separate SPA frontend), including AI instructions, use cases, user stories, DB schema, and app flow.
 
+## Design Documents
+- [High-Level Design (HLD)](./Backend/docs/hld.md)
+- [Low-Level Design (LLD)](./Backend/docs/lld.md)
+
+---
+
 ## 1) Problem & Approach
 
 Build a banking operations platform with a classic ERP-style UI, supporting high operational scale (target: ~100K users), strong governance (RBAC, 2FA, maker-checker), and full auditability.  
@@ -264,3 +270,58 @@ Use these todo IDs/titles/descriptions in your tracker:
 ---
 
 ## 10) Sequence Diagrams
+
+### Internal transfer approval flow
+```mermaid
+sequenceDiagram
+    participant UI as UI
+    participant API as Gateway
+    participant TXN as Transaction Service
+    participant AP as Approval Service
+    participant LED as Ledger Service
+    participant AUD as Audit Service
+
+    UI->>API: submit transfer
+    API->>TXN: validate request
+    TXN->>TXN: check account status + idempotency
+    TXN->>AP: create approval task (if required)
+    AP-->>UI: pending approval
+    UI->>AP: approve request
+    AP->>TXN: approval confirmed
+    TXN->>LED: post debit/credit entries
+    LED-->>TXN: posted ledger entries
+    TXN->>AUD: emit audit record
+    TXN-->>UI: success response
+```
+
+### Customer onboarding and account opening
+```mermaid
+sequenceDiagram
+    participant User as Branch Staff
+    participant API as API Gateway
+    participant CUST as Customer Service
+    participant ACCT as Account Service
+    participant AUD as Audit Service
+
+    User->>API: create customer profile
+    API->>CUST: validate and persist customer
+    CUST->>AUD: emit CustomerCreated event
+    User->>API: open account for customer
+    API->>ACCT: create account
+    ACCT->>AUD: emit AccountOpened event
+    ACCT-->>User: account created
+```
+
+---
+
+## 11) Design References
+
+- [High-Level Design (HLD)](./Backend/docs/hld.md)
+- [Low-Level Design (LLD)](./Backend/docs/lld.md)
+- [Architecture Decision Records](./Backend/docs/adr)
+
+---
+
+## 12) Summary
+
+This repository defines a secure, auditable, and operationally strong banking platform using a microservices-first architecture with strong domain boundaries, event-driven integration, financial controls, and enterprise-grade UX. It combines service decomposition with strict compliance patterns such as JWT-based authentication, MFA, RBAC, maker-checker approval, immutable audit trails, and double-entry accounting.

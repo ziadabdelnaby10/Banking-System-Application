@@ -23,14 +23,16 @@ create table if not exists notifications (
     metadata jsonb default '{}'::jsonb,
     status varchar(20) not null default 'PENDING', -- PENDING, SENT, FAILED
     attempts integer not null default 0,
+    correlation_id varchar(64) not null,
     last_attempt_at timestamptz,
     created_at timestamptz not null default now(),
     sent_at timestamptz,
-    created_by bigint references users(id)
+    created_by uuid references users(id)
 );
 
 create index if not exists notifications_external_idx on notifications (external_id);
 create index if not exists notifications_status_created_idx on notifications (status, created_at);
+create index if not exists notifications_correlation_idx on notifications (correlation_id);
 
 create table if not exists notification_attempts (
     id bigserial primary key,
@@ -38,10 +40,12 @@ create table if not exists notification_attempts (
     provider varchar(120) not null,
     status varchar(20) not null,
     response_text text,
+    correlation_id varchar(64) not null,
     attempt_at timestamptz not null default now()
 );
 
 create index if not exists notification_attempts_notification_idx on notification_attempts (notification_id);
+create index if not exists notification_attempts_correlation_idx on notification_attempts (correlation_id);
 
 -- Simple trigger to update updated_at on templates
 create or replace function set_updated_at_notifications()

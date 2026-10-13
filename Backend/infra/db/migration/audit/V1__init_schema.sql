@@ -1,10 +1,10 @@
 create table if not exists audit_logs (
     id bigserial primary key,
-    actor_id bigint,
+    actor_id uuid,
     actor_type varchar(50),
     action varchar(120) not null,
     entity_type varchar(80) not null,
-    entity_id bigint,
+    entity_id varchar(64),
     payload_json jsonb not null default '{}'::jsonb,
     ip_address inet,
     correlation_id varchar(64) not null,
@@ -24,4 +24,6 @@ create table if not exists event_store (
 
 create index if not exists audit_logs_entity_created_at_idx on audit_logs (entity_type, entity_id, created_at);
 create index if not exists audit_logs_actor_created_at_idx on audit_logs (actor_id, created_at);
+create index if not exists audit_logs_correlation_idx on audit_logs (correlation_id);
 create index if not exists event_store_aggregate_idx on event_store (aggregate_type, aggregate_id, occurred_at);
+create index if not exists event_store_correlation_idx on event_store (correlation_id);
