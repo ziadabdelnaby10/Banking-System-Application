@@ -1,0 +1,13 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  config:
+    import: optional:file:.env[.properties]
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/ziadabdelnaby10/Banking-System-Application/tree/config
