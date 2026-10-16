@@ -1,13 +1,20 @@
-server:
-  port: 8888
+eureka:
+  instance:
+    # Prefer hostname-based registration by default; can be switched when needed for container networking.
+    prefer-ip-address: ${EUREKA_PREFER_IP:false}
+    # Default hostname used by service discovery clients when no environment override is supplied.
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
+  client:
+    service-url:
+      # Shared Eureka registry location used by all services unless locally overridden.
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka}
 
 spring:
-  application:
-    name: config-server
   config:
+    # Allow each service to read local developer overrides in addition to config-server values.
     import: optional:file:.env[.properties]
   cloud:
     config:
-      server:
-        git:
-          uri: https://github.com/ziadabdelnaby10/Banking-System-Application/tree/config
+      # Environment variables and JVM system properties must win over config-server defaults.
+      # This is essential for Docker, CI, and local overrides.
+      override-system-properties: false
