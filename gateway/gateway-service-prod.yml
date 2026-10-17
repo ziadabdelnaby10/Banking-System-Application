@@ -5,6 +5,8 @@ spring:
   config:
     # Also allow local .env-based overrides when running outside containers.
     import: optional:file:.env[.properties]
+  main:
+    web-application-type: reactive
     
 eureka:
   instance:
