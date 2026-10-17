@@ -1,0 +1,14 @@
+server:
+  port: ${SERVER_PORT:9000}
+
+eureka:
+  instance:
+    prefer-ip-address: ${EUREKA_PREFER_IP:false}
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka}
+
+logging:
+  level:
+    root: "INFO"
