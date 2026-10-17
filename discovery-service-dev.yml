@@ -12,4 +12,4 @@ eureka:
       defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
 logging:
   level:
-    root: ERROR,WARN
+    root: "ERROR","WARN"
