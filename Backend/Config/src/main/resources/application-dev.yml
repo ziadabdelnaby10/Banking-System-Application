@@ -1,0 +1,34 @@
+server:
+  port: 8888
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+spring:
+  application:
+    name: config-server
+  config:
+    import: optional:file:.env[.properties]
+  cloud:
+    config:
+      server:
+        git:
+          uri: ${CONFIG_REPO_URI:https://github.com/ziadabdelnaby10/Banking-System-Application.git}
+          default-label: ${CONFIG_REPO_BRANCH:config}
+          clone-on-start: true
+          skip-ssl-validation: true
+          search-paths:
+            - "${CONFIG_REPO_SEARCH_PATH:}"
+            - "${CONFIG_DISCOVERY_SEARCH_PATH:discovery}"
+            - "${CONFIG_GATEWAY_SEARCH_PATH:gateway}"
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+logging:
+  level:
+    root: "DEBUG"

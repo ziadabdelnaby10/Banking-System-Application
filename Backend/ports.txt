@@ -1,0 +1,3 @@
+config-service=8888
+discovery-service=8761
+gateway-service=9000
