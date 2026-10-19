@@ -5,15 +5,30 @@ on:
     branches:
       - main
       - develop
+    paths:
+      - 'Backend/**'
+      - '.github/workflows/ci.yml'
   push:
     branches:
       - main
       - develop
+    paths:
+      - 'Backend/**'
+      - '.github/workflows/ci.yml'
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - CommonsDTO
+          - Config
+          - Discovery
+          - Gateway
+          - Identity
 
     services:
       postgres:
@@ -40,6 +55,10 @@ jobs:
           --health-timeout=5s
           --health-retries=10
 
+    defaults:
+      run:
+        working-directory: Backend/${{ matrix.module }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -51,15 +70,10 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Validate project structure
-        run: |
-          if [ ! -f pom.xml ] && [ ! -f gradlew ]; then
-            echo "Neither pom.xml nor gradlew was found in Backend. Add a Maven or Gradle build before using CI."
-            exit 1
-          fi
+      - name: Validate Maven wrapper
+        run: test -f ./mvnw
 
-      - name: Run Maven verify
-        if: ${{ hashFiles('pom.xml') != '' }}
+      - name: Run module tests
         env:
           SPRING_PROFILES_ACTIVE: ci
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/banking_app_test
@@ -69,18 +83,6 @@ jobs:
           SPRING_DATA_REDIS_PORT: '6379'
         run: ./mvnw -B -ntp clean verify
 
-      - name: Run Gradle build
-        if: ${{ hashFiles('gradlew') != '' }}
-        env:
-          SPRING_PROFILES_ACTIVE: ci
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/banking_app_test
-          SPRING_DATASOURCE_USERNAME: banking_app
-          SPRING_DATASOURCE_PASSWORD: banking_app_password
-          SPRING_DATA_REDIS_HOST: localhost
-          SPRING_DATA_REDIS_PORT: '6379'
-        run: |
-          chmod +x gradlew
-          ./gradlew clean build
-
-      - name: Build container image
-        run: docker build -t banking-system-app:ci .
+      - name: Validate docker compose file
+        working-directory: Backend
+        run: docker compose config >/dev/null

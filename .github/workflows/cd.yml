@@ -15,7 +15,7 @@ env:
 jobs:
   publish-image:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     permissions:
       contents: read
@@ -46,10 +46,11 @@ jobs:
             type=sha
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push image
+      - name: Build and push backend image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./Backend
+          file: ./Backend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -57,12 +58,12 @@ jobs:
   deploy:
     needs: publish-image
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     if: ${{ github.event_name == 'workflow_dispatch' }}
     environment: production
 
     steps:
-      - name: Deploy reminder
+      - name: Deployment reminder
         run: |
-          echo "Image published to GHCR. Configure deployment here using your target platform (Kubernetes, VM, or PaaS)."
+          echo "Image published to GHCR. Configure your target host or orchestration platform before enabling automatic deployment."
           echo "Recommended inputs: DEPLOY_HOST, DEPLOY_USER, DEPLOY_KEY, DEPLOY_PATH, IMAGE_TAG."
