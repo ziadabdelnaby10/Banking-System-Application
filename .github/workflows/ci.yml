@@ -71,7 +71,9 @@ jobs:
           cache: maven
 
       - name: Validate Maven wrapper
-        run: test -f ./mvnw
+        run: |
+          test -f ./mvnw
+          chmod +x ./mvnw
 
       - name: Run module tests
         env:
