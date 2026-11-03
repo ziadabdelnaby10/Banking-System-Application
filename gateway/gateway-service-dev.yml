@@ -16,7 +16,7 @@ spring:
           routes:
             - id: identity-service
               # lb:// = look the service up by name in Eureka (Discovery) and load-balance.
-              uri: lb://identity-service
+              uri: lb://IDENTITY-SERVICE
               predicates:
                 - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/admin/**,/.well-known/jwks.json
           # CORS = which websites (origins) a browser is allowed to call this API from.
