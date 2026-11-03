@@ -56,6 +56,10 @@ logging:
   level:
     root: "INFO"
 bank:
+  identity:
+    token:
+    # Enabled so you don't have to generate a private-key.pem it will be generated auto
+      allow-ephemeral-key: true
   security:
     enabled: false
     # Endpoints reachable without a bearer token. Everything else requires a valid access token.
