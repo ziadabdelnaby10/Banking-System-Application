@@ -55,7 +55,8 @@ bank:
       - /api/v1/auth/logout
     jwt:
       # Only tokens issued by this "issuer" (Identity's address) are accepted.
-      issuer: ${IDENTITY_JWT_ISSUER:http://identity-service/.well-known/jwks.json}
+      issuer: ${IDENTITY_JWT_ISSUER:Gateway}
+      jwk-set-uri: ${IDENTITY_JWK_SET_URI:http://identity-service/.well-known/jwks.json}
 
 
 logging:
