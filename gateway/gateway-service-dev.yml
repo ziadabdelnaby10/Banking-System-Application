@@ -7,7 +7,29 @@ spring:
     import: optional:file:.env[.properties]
   main:
     web-application-type: reactive
-    
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # Local defaults; the Config Server may override or extend them per environment.
+          # ROUTES = forwarding rules: "requests whose path matches X go to service Y".
+          routes:
+            - id: identity-service
+              # lb:// = look the service up by name in Eureka (Discovery) and load-balance.
+              uri: lb://identity-service
+              predicates:
+                - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/admin/**,/.well-known/jwks.json
+          # CORS = which websites (origins) a browser is allowed to call this API from.
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+                allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+                allowed-headers: Authorization,Content-Type,X-Correlation-Id
+                exposed-headers: X-Correlation-Id,Retry-After
+                # Bearer tokens travel in a header, never in cookies.
+                allow-credentials: false
+                max-age: 3600
 eureka:
   instance:
     prefer-ip-address: ${EUREKA_PREFER_IP:false}
@@ -17,6 +39,32 @@ eureka:
     service-url:
       defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka}
 
+bank:
+  security:
+    # The gateway authenticates (valid token required); roles and branch scope are enforced by each service.
+    # Verification key (one of): BANK_SECURITY_JWT_PUBLICKEYLOCATION=file:/run/secrets/identity-jwt-public.pem
+    #                            BANK_SECURITY_JWT_JWKSETURI=http://identity-service/.well-known/jwks.json
+    # PUBLIC PATHS = endpoints reachable WITHOUT a token (you can't have a token before you log in).
+    public-paths:
+      - /actuator/health/**
+      - /actuator/info
+      - /.well-known/jwks.json
+      - /api/v1/auth/login
+      - /api/v1/auth/mfa/verify
+      - /api/v1/auth/refresh
+      - /api/v1/auth/logout
+    jwt:
+      # Only tokens issued by this "issuer" (Identity's address) are accepted.
+      issuer: ${IDENTITY_JWT_ISSUER:http://identity-service/.well-known/jwks.json}
+
+
 logging:
   level:
     root: "DEBUG"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Only expose health/info monitoring endpoints.
+        include: health,info
