@@ -21,10 +21,10 @@ spring:
       pageable:
         max-page-size: 100
         default-page-size: 20
-  web:
-    error:
-      include-message: never
-      include-stacktrace: never
+  #web:
+    #error:
+      #include-message: never
+      #include-stacktrace: never
   jpa:
     show-sql: true
     hibernate:
@@ -70,6 +70,6 @@ bank:
     # AUDITOR needs a cross-branch view; ADMIN is unrestricted.
     branch-bypass-roles: ADMIN,AUDITOR
     jwt:
-      issuer: ${IDENTITY_JWT_ISSUER:http://localhost:8081}
+      issuer: ${IDENTITY_JWT_ISSUER:http://localhost:9001/.well-known/jwks.json}
   # Signing key: set BANK_IDENTITY_TOKEN_PRIVATEKEYLOCATION=file:/run/secrets/identity-jwt-private.pem
   # (PKCS#8 PEM). Never commit keys.
