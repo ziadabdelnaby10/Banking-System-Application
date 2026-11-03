@@ -74,6 +74,6 @@ bank:
     # AUDITOR needs a cross-branch view; ADMIN is unrestricted.
     branch-bypass-roles: ADMIN,AUDITOR
     jwt:
-      issuer: ${IDENTITY_JWT_ISSUER:http://localhost:9001/.well-known/jwks.json}
+      issuer: ${IDENTITY_JWT_ISSUER:bank}
   # Signing key: set BANK_IDENTITY_TOKEN_PRIVATEKEYLOCATION=file:/run/secrets/identity-jwt-private.pem
   # (PKCS#8 PEM). Never commit keys.
