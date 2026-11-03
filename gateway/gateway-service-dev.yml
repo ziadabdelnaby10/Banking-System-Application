@@ -41,6 +41,7 @@ eureka:
 
 bank:
   security:
+    enable: true
     # The gateway authenticates (valid token required); roles and branch scope are enforced by each service.
     # Verification key (one of): BANK_SECURITY_JWT_PUBLICKEYLOCATION=file:/run/secrets/identity-jwt-public.pem
     #                            BANK_SECURITY_JWT_JWKSETURI=http://identity-service/.well-known/jwks.json
