@@ -23,14 +23,32 @@
 - `PATCH`: docs and non-contract internal fixes
 
 ## Error Contract
-- Canonical payload: `ProblemDetails`
-- Field level validation: `ApiErrorDetail` list
-- Stable functional error code: `ErrorCode` enum
+- Canonical payload: `ApiErrorDetail` (`timestamp`, `status`, `error`, `code`, `message`, `path`, `correlationId`, `violations[]`)
+- Field level validation: `violations` list of `FieldViolation(field, message)`
+- Stable functional error code: `ErrorCode` enum, which also owns the HTTP status (`ErrorCode.httpStatus()`)
+- Throw `BankException` subclasses (`ResourceNotFoundException`, `DuplicateResourceException`, `BusinessRuleException`, `AuthenticationFailedException`, `AccountLockedException`) from services; each service maps them in one `@RestControllerAdvice`
+- Security failures (401/403) are written by `Backend/CommonSecurity` in the same shape
+
+| ErrorCode | HTTP |
+|---|---|
+| BAD_REQUEST | 400 |
+| UNAUTHENTICATED, INVALID_CREDENTIALS, INVALID_TOKEN, MFA_INVALID | 401 |
+| ACCESS_DENIED, ACCOUNT_DISABLED | 403 |
+| RESOURCE_NOT_FOUND | 404 |
+| DUPLICATE_RESOURCE | 409 |
+| VALIDATION_FAILED, BUSINESS_RULE_VIOLATION | 422 |
+| ACCOUNT_LOCKED | 423 (`Retry-After` header when known) |
+| INTERNAL_ERROR | 500 |
+
+## Security Library
+- Module: `Backend/CommonSecurity`, artifact `org.bank.common:security` (see its README)
+- Depends on `org.bank.common:dto`; DTOs stay free of Spring Security
 
 ## Local Publishing (Option A)
+Build order matters: `CommonsDTO` first, then `CommonSecurity`, then services.
 ```bash
-cd Backend\CommonsDTO
-mvnw.cmd clean install
+cd Backend\CommonsDTO && mvnw.cmd clean install
+cd Backend\CommonSecurity && mvnw.cmd clean install
 ```
 
 ## Consumer Workflow

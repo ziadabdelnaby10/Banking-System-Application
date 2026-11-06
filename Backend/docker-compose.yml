@@ -4,23 +4,20 @@ services: # Top-level key defining the services in this compose file
     container_name: banking-postgres # container name for easier reference
     restart: unless-stopped # restart policy
     ports:
-      - "5432:5432" # expose Postgres port to host for local connections
+      - "5434:5432" # expose Postgres port to host for local connections
     environment: # environment variables for Postgres configuration
       POSTGRES_DB: ${POSTGRES_DB:-banking_app} # database name (from .env or default)
-      POSTGRES_USER: ${POSTGRES_USER:-banking_app} # DB user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-banking_app_password} # DB password
+      POSTGRES_USER: ${POSTGRES_USER:-user} # DB user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rootroot} # DB password
       TZ: UTC # set timezone
-    command: > # additional Postgres runtime options
-      postgres
-      -c shared_preload_libraries=pg_stat_statements # enable stats extension
-      -c max_connections=300 # allow more concurrent connections in dev
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "max_connections=300"] # additional Postgres runtime options
     volumes:
       - postgres_data:/var/lib/postgresql/data # persist DB files in a named volume
-      - ./infra/db/init:/docker-entrypoint-initdb.d:ro # run init scripts on startup
+      - ./infra/db/init/init.sql:/docker-entrypoint-initdb.d/init.sql:ro # run init scripts on startup
     networks:
       - backend_network # connect to the backend network for inter-service communication
     healthcheck: # container healthcheck for orchestration
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-banking_app} -d ${POSTGRES_DB:-banking_app}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-banking_app}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -42,35 +39,104 @@ services: # Top-level key defining the services in this compose file
       timeout: 5s
       retries: 10
 
-  kafka: # Confluent Kafka running in KRaft (no Zookeeper) for eventing
+  kafka-1: # Kafka broker 1 (combined broker+controller for local KRaft cluster)
     image: confluentinc/cp-kafka:7.4.0 # Confluent Platform image (KRaft capable)
-    container_name: banking-kafka # container name for easier reference
+    container_name: banking-kafka-1 # container name for easier reference
     restart: unless-stopped # restart policy
     ports:
-      - "9092:9092" # bootstrap server port exposed to host
+      - "9092:9092" # broker 1 external listener
     environment: # Kafka / KRaft environment variables
       CLUSTER_ID: "WnLkTHhkQaiJbwP8FClPhw"
       KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller # run both broker and controller roles in same process (KRaft)
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9091 # controller quorum voters (single-node dev setup)
-      KAFKA_LISTENERS: PLAINTEXT://:9090,CONTROLLER://:9091,EXTERNAL://:9092 # listeners for clients and controller
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9090,EXTERNAL://localhost:9092 # advertised address for clients
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER # controller listener name
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT # inter-broker protocol listener
+      KAFKA_PROCESS_ROLES: broker,controller # keep combined roles as requested
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9091,2@kafka-2:9091,3@kafka-3:9091
+      KAFKA_LISTENERS: PLAINTEXT://:9090,CONTROLLER://:9091,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9090,EXTERNAL://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
-      # KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true" # convenient for dev (auto-create topics)
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1 # replication factor for internal topics
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1 # replication for transaction log
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1 # min ISR for transaction log
-      KAFKA_LOG_RETENTION_HOURS: 168 # default log retention (in hours)
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0 # speed up consumer group rebalances in dev
-      CONFLUENT_SUPPORT_METRICS_ENABLE: "false" # disable Confluent metrics reporting in dev
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3 # internal topic replication across 3 brokers
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3 # txn log replication across 3 brokers
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2 # tolerate one broker outage
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3 # default replication factor for new topics
+      KAFKA_MIN_INSYNC_REPLICAS: 2 # require 2 in-sync replicas for writes
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CONFLUENT_SUPPORT_METRICS_ENABLE: "false"
     volumes:
-      - kafka_data:/var/lib/kafka/data
+      - kafka_1_data:/var/lib/kafka/data
     networks:
       - backend_network # connect to the backend network for inter-service communication
-    healthcheck: # ensure Kafka is responding to admin calls
+    healthcheck: # ensure broker is responding
       test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  kafka-2: # Kafka broker 2 (follower/leader eligible)
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: banking-kafka-2
+    restart: unless-stopped
+    ports:
+      - "9093:9093" # broker 2 external listener
+    environment:
+      CLUSTER_ID: "WnLkTHhkQaiJbwP8FClPhw"
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9091,2@kafka-2:9091,3@kafka-3:9091
+      KAFKA_LISTENERS: PLAINTEXT://:9090,CONTROLLER://:9091,EXTERNAL://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9090,EXTERNAL://localhost:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CONFLUENT_SUPPORT_METRICS_ENABLE: "false"
+    volumes:
+      - kafka_2_data:/var/lib/kafka/data
+    networks:
+      - backend_network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9093 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  kafka-3: # Kafka broker 3 (follower/leader eligible)
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: banking-kafka-3
+    restart: unless-stopped
+    ports:
+      - "9094:9094" # broker 3 external listener
+    environment:
+      CLUSTER_ID: "WnLkTHhkQaiJbwP8FClPhw"
+      KAFKA_NODE_ID: 3
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-1:9091,2@kafka-2:9091,3@kafka-3:9091
+      KAFKA_LISTENERS: PLAINTEXT://:9090,CONTROLLER://:9091,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:9090,EXTERNAL://localhost:9094
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CONFLUENT_SUPPORT_METRICS_ENABLE: "false"
+    volumes:
+      - kafka_3_data:/var/lib/kafka/data
+    networks:
+      - backend_network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9094 --list >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 20
@@ -90,8 +156,15 @@ services: # Top-level key defining the services in this compose file
 
 volumes: # Named volumes used by services
   postgres_data: # Postgres data persistence volume
+    driver: local # use local driver for volume storage
   redis_data: # Redis data persistence volume
-  kafka_data: # Kafka data persistence volume
+    driver: local # use local driver for volume storage
+  kafka_1_data: # Kafka broker 1 data persistence volume
+    driver: local # use local driver for volume storage
+  kafka_2_data: # Kafka broker 2 data persistence volume
+    driver: local # use local driver for volume storage
+  kafka_3_data: # Kafka broker 3 data persistence volume
+    driver: local # use local driver for volume storage
 
 networks:
   backend_network: # custom network for backend services
