@@ -27,8 +27,9 @@ spring:
             - "${CONFIG_REPO_SEARCH_PATH:}"
             - "${CONFIG_DISCOVERY_SEARCH_PATH:discovery}"
             - "${CONFIG_GATEWAY_SEARCH_PATH:gateway}"
+            - "${CONFIG_IDENTITY_SEARCH_PATH:identity}"
 #  profiles:
 #    active: ${SPRING_PROFILES_ACTIVE:dev}
 logging:
   level:
-    root: "WARN"
+    root: "INFO"

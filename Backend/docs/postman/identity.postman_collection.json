@@ -1,0 +1,659 @@
+{
+  "info": {
+    "_postman_id": "6f1d2c1e-7a53-4b0e-9d3a-2f6b1c0a9e11",
+    "name": "Banking System - Identity (via Gateway)",
+    "description": "Identity service endpoints, called through the API Gateway ({{baseUrl}}).\n\nQuick start:\n1. Import this collection and local.postman_environment.json, select the environment.\n2. Run Auth > 1. Login (teller1). The access/refresh tokens are saved automatically and sent as a Bearer token on every other request.\n3. For MFA users (admin, manager1, auditor1): run Auth > 2. Login (MFA user), read the code from the Identity log ([DEV ONLY] line), put it in the mfaCode variable, run Auth > 3. Verify MFA.\n4. Users/Admin requests need permissions (USER_CREATE, USER_VIEW, ROLE_ASSIGN, AUDIT_VIEW ...): log in as admin to try everything.\n\nThe Users and Admin folders can be run top to bottom in the Runner (smoke test) after logging in as a user holding the needed permissions (Auth > 2/3 with admin). Do not run the Auth folder in the Runner: the MFA steps need a code you type in.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// A fresh correlation id per request so one call can be found across the Gateway and service logs.",
+          "pm.request.headers.upsert({ key: 'X-Correlation-Id', value: pm.variables.replaceIn('{{$guid}}') });"
+        ]
+      }
+    }
+  ],
+  "variable": [],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Public endpoints - no bearer token.",
+      "item": [
+        {
+          "name": "1. Login (teller1, no MFA)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and no-store', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('AUTHENTICATED with tokens', function () {",
+                  "  pm.expect(body.status).to.eql('AUTHENTICATED');",
+                  "  pm.expect(body.tokens.accessToken).to.be.a('string');",
+                  "  pm.expect(body.tokens.tokenType).to.eql('Bearer');",
+                  "});",
+                  "if (body.tokens) {",
+                  "  pm.collectionVariables.set('accessToken', body.tokens.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.tokens.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Returns tokens (status AUTHENTICATED) for users without MFA. Wrong credentials -> 401; too many failures -> 423 with a Retry-After header."
+          }
+        },
+        {
+          "name": "2. Login (MFA user)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test('MFA_REQUIRED with a challenge', function () {",
+                  "  pm.expect(body.status).to.eql('MFA_REQUIRED');",
+                  "  pm.expect(body.mfaChallenge.challengeToken).to.be.a('string');",
+                  "});",
+                  "if (body.mfaChallenge) {",
+                  "  pm.collectionVariables.set('challengeToken', body.mfaChallenge.challengeToken);",
+                  "}",
+                  "if (body.tokens) {",
+                  "  pm.collectionVariables.set('accessToken', body.tokens.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.tokens.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{mfaUsername}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "For admin, manager1, auditor1. Returns an MFA challenge. In the dev profile the one-time code is printed in the Identity service log ([DEV ONLY]). Copy it into the mfaCode variable."
+          }
+        },
+        {
+          "name": "3. Verify MFA",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and tokens issued', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.accessToken).to.be.a('string');",
+                  "  pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"challengeToken\": \"{{challengeToken}}\",\n  \"code\": \"{{mfaCode}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/mfa/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "mfa", "verify"]
+            },
+            "description": "challengeToken comes from request 2; code is 6-10 digits."
+          }
+        },
+        {
+          "name": "4. Refresh tokens",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and rotated tokens', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.refreshToken).to.not.eql(pm.collectionVariables.get('refreshToken'));",
+                  "  pm.collectionVariables.set('accessToken', body.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', body.refreshToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "refresh"]
+            },
+            "description": "Single-use refresh tokens: re-sending an old one revokes the whole session."
+          }
+        },
+        {
+          "name": "5. Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            },
+            "description": "Revokes the session of the given refresh token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "Bearer token required. Permissions are listed per request.",
+      "item": [
+        {
+          "name": "Current user (me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and has a username', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().username).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "me"]
+            },
+            "description": "Any authenticated user."
+          }
+        },
+        {
+          "name": "Search users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and a page', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.content).to.be.an('array');",
+                  "  pm.expect(body).to.have.property('totalElements');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users?page=0&size=20&sort=username,asc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "username,asc" },
+                { "key": "q", "value": "teller", "disabled": true },
+                { "key": "status", "value": "ACTIVE", "disabled": true },
+                { "key": "branchCode", "value": "BR001", "disabled": true },
+                { "key": "role", "value": "TELLER", "disabled": true }
+              ]
+            },
+            "description": "Permission USER_VIEW. Branch-restricted callers only see their own branch. Sortable: username, email, status, createdAt, lastLoginAt, branchCode."
+          }
+        },
+        {
+          "name": "Create user",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique username per run so the request can be repeated.",
+                  "const suffix = Date.now().toString().slice(-8);",
+                  "pm.collectionVariables.set('newUsername', 'qa.' + suffix);",
+                  "pm.collectionVariables.set('newEmail', 'qa.' + suffix + '@bank.local');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 with Location', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(pm.response.headers.get('Location')).to.include('/api/v1/users/');",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('returns the new user', function () {",
+                  "  pm.expect(body.id).to.be.a('string');",
+                  "  pm.expect(body.username).to.eql(pm.collectionVariables.get('newUsername'));",
+                  "});",
+                  "pm.collectionVariables.set('userId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{newUsername}}\",\n  \"email\": \"{{newEmail}}\",\n  \"password\": \"{{newPassword}}\",\n  \"branchCode\": \"{{branchCode}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users"]
+            },
+            "description": "Permission USER_CREATE and access to the target branch. Saves userId for the requests below. Password must satisfy the strong-password rule."
+          }
+        },
+        {
+          "name": "Get user by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and the same user', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get('userId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            },
+            "description": "Permission USER_VIEW. Run Create user first (it saves userId)."
+          }
+        },
+        {
+          "name": "Update user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and fields updated', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().mfaEnabled).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchCode\": \"{{branchCode}}\",\n  \"mfaEnabled\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "{{userId}}"]
+            },
+            "description": "Permission USER_UPDATE. Partial update: omitted/null fields stay unchanged (email, branchCode, mfaEnabled)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "description": "Bearer token required. Permissions are listed per request.",
+      "item": [
+        {
+          "name": "List roles",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and a role list', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const roles = pm.response.json();",
+                  "  pm.expect(roles).to.be.an('array').that.is.not.empty;",
+                  "  const teller = roles.find(function (r) { return r.name === 'TELLER'; }) || roles[0];",
+                  "  pm.collectionVariables.set('roleId', teller.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/roles",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "roles"]
+            },
+            "description": "Permission USER_VIEW. Saves the TELLER role id as roleId."
+          }
+        },
+        {
+          "name": "Assign role to user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}/roles/{{roleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", "{{userId}}", "roles", "{{roleId}}"]
+            },
+            "description": "Permission ROLE_ASSIGN. Needs userId (Create user) and roleId (List roles)."
+          }
+        },
+        {
+          "name": "Remove role from user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}/roles/{{roleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", "{{userId}}", "roles", "{{roleId}}"]
+            },
+            "description": "Permission ROLE_ASSIGN."
+          }
+        },
+        {
+          "name": "Lock user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and LOCKED', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().status).to.eql('LOCKED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"LOCKED\",\n  \"reason\": \"Postman smoke test\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", "{{userId}}", "status"]
+            },
+            "description": "Permission USER_LOCK. status: ACTIVE, LOCKED or DISABLED; reason is mandatory (audit)."
+          }
+        },
+        {
+          "name": "Unlock user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and ACTIVE', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().status).to.eql('ACTIVE');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACTIVE\",\n  \"reason\": \"Postman smoke test finished\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/{{userId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", "{{userId}}", "status"]
+            },
+            "description": "Permission USER_LOCK."
+          }
+        },
+        {
+          "name": "Search login attempts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and a page', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().content).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/login-attempts?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "login-attempts"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "username", "value": "teller1", "disabled": true },
+                { "key": "result", "value": "SUCCESS", "disabled": true },
+                { "key": "from", "value": "2026-01-01T00:00:00Z", "disabled": true },
+                { "key": "to", "value": "2026-12-31T23:59:59Z", "disabled": true }
+              ]
+            },
+            "description": "Permission AUDIT_VIEW. Newest first. Filters: username, userId, result, from, to (ISO-8601 date-time)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "JWKS",
+      "item": [
+        {
+          "name": "Public signing keys",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 and at least one RSA key', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const keys = pm.response.json().keys;",
+                  "  pm.expect(keys).to.be.an('array').that.is.not.empty;",
+                  "  pm.expect(keys[0].kty).to.eql('RSA');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/.well-known/jwks.json",
+              "host": ["{{baseUrl}}"],
+              "path": [".well-known", "jwks.json"]
+            },
+            "description": "Public. The key set other services use to verify access tokens."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Manual only (changes state)",
+      "description": "Not part of the smoke flow: send these by hand.",
+      "item": [
+        {
+          "name": "Change my password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{password}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me/password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "me", "password"]
+            },
+            "description": "Any authenticated user. WARNING: really changes the password of the logged-in user (the seeded password stops working). Update the password variable afterwards."
+          }
+        }
+      ]
+    }
+  ]
+}

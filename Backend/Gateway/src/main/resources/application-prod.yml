@@ -1,0 +1,6 @@
+# PROD PROFILE: no API documentation page and no document endpoints.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

@@ -1,0 +1,25 @@
+spring:
+  cloud:
+    config:
+      enabled: false
+  flyway:
+    # Normally supplied by the Config Server (dev profile); tests run without it.
+    locations: classpath:db/migration,classpath:db/migration-dev
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+bank:
+  security:
+    # Normally supplied by the Config Server; tests run without it.
+    public-paths:
+      - /actuator/health/**
+      - /actuator/info
+      - /api/v1/auth/**
+      - /.well-known/jwks.json
+    jwt:
+      issuer: http://localhost:9000
+  identity:
+    token:
+      allow-ephemeral-key: true

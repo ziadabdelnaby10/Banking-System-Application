@@ -5,6 +5,3 @@ spring:
     import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
   profiles:
     active: ${PROFILE:dev}
-eureka:
-  instance:
-    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}

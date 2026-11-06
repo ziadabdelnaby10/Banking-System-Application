@@ -1,0 +1,6 @@
+# API documentation is a development aid: do not publish the endpoint map in production.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
