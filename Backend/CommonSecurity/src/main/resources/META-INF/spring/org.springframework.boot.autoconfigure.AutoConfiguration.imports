@@ -1,0 +1,5 @@
+# This file tells Spring Boot which configuration classes to load automatically when an app adds this jar.
+# First: security for Servlet apps (Identity). Second: security for WebFlux apps (Gateway).
+# Each one switches itself on only for its own kind of application.
+org.bank.common.security.config.BankSecurityAutoConfiguration
+org.bank.common.security.config.BankReactiveSecurityAutoConfiguration
