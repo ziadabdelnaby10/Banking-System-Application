@@ -57,7 +57,7 @@ bank:
     jwt:
       # Only tokens issued by this "issuer" (Identity's address) are accepted.
       issuer: ${IDENTITY_JWT_ISSUER:bank}
-      jwk-set-uri: ${IDENTITY_JWK_SET_URI:lb://identity-service/.well-known/jwks.json}
+      jwk-set-uri: ${IDENTITY_JWK_SET_URI:http://localhost:9001/.well-known/jwks.json}
 
 
 logging:
