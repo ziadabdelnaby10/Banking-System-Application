@@ -1,0 +1,76 @@
+# CUSTOMER SERVICE CONFIGURATION
+# Settings that are identical in every environment. Environment-specific values (database, token issuer,
+# secrets) come from the Config Server, environment variables, or application-dev.yml for local work.
+server:
+  port: ${SERVER_PORT:9002}
+eureka:
+  instance:
+    prefer-ip-address: ${EUREKA_PREFER_IP:false}
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
+    instance-id: ${spring.application.name}:${spring.application.instance_id:${random.value}}
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER_URL:http://localhost:8761/eureka}
+
+spring:
+  config:
+    # Also allow local .env-based overrides when running outside containers.
+    import: optional:file:.env[.properties]
+  flyway:
+    baseline-on-migrate: true
+    enabled: true
+    baseline-description: "init"
+    baseline-version: 0
+  jpa:
+    # Never lazy-load while rendering JSON: every query is explicit, which keeps N+1 out of the web layer.
+    open-in-view: false
+    show-sql: true
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        # Safety net: collections that are touched anyway are loaded in batches of 50, not one by one.
+        default_batch_fetch_size: 50
+        format_sql: true
+        show_sql: true
+        jdbc:
+          time_zone: UTC
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
+  cache:
+    type: caffeine
+    cache-names: branches
+    # Short TTL: each instance has its own cache, so a branch change reaches other instances within a minute.
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=60s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "
+  level:
+    root: "INFO"
+bank:
+  security:
+    public-paths:
+      - /actuator/health/**
+      - /actuator/info
+    # AUDITOR needs a cross-branch view; ADMIN is unrestricted.
+    branch-bypass-roles: ADMIN,AUDITOR
+    jwt:
+      # Must equal the issuer Identity writes into its tokens, otherwise every token is rejected.
+      issuer: ${IDENTITY_JWT_ISSUER:bank}
+      jwk-set-uri: ${IDENTITY_JWK_SET_URI:http://localhost:9001/.well-known/jwks.json}
+  customer:
+    # Secret key for the HMAC fingerprint of national ids (used for uniqueness without storing the id).
+    national-id-pepper: ${CUSTOMER_NATIONAL_ID_PEPPER:tQ+RzlEqWFQ5vg1oK0I/1abT4pxpOAiR5acdIPUm9k0=}
