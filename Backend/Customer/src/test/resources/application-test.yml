@@ -1,0 +1,24 @@
+spring:
+  cloud:
+    config:
+      enabled: false
+  flyway:
+    locations: classpath:db/migration,classpath:db/migration-dev
+  jpa:
+    properties:
+      hibernate:
+        # Lets the query-count tests prove the absence of N+1 selects.
+        generate_statistics: true
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+bank:
+  security:
+    jwt:
+      issuer: http://localhost:9000
+      # The real URI (a local JWKS server standing in for Identity) is set by the tests.
+      jwk-set-uri: http://localhost:0/.well-known/jwks.json
+  customer:
+    national-id-pepper: test-only-pepper-0123456789abcdef

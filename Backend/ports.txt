@@ -2,3 +2,4 @@ config-service=8888
 discovery-service=8761
 gateway-service=9000
 identity-service=9001
+customer-service=9002

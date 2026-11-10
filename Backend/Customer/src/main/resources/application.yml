@@ -1,0 +1,10 @@
+# CUSTOMER SERVICE CONFIGURATION
+# Settings that are identical in every environment. Environment-specific values (database, token issuer,
+# secrets) come from the Config Server, environment variables, or application-dev.yml for local work.
+spring:
+  application:
+    name: customer-service
+  config:
+    import: optional:configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  profiles:
+    active: ${PROFILE:dev}

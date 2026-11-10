@@ -1,9 +1,6 @@
 package org.bank.common.dto.request;
 
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 import org.bank.common.validation.StrongPassword;
 
 import java.io.Serializable;
@@ -18,7 +15,7 @@ public record CreateUserRequest(
         String password,
         @Size(max = 20)
         String branchCode,
-        @Size(max = 10)
+        @NotNull @NotEmpty @Size(max = 10)
         Set<Long> roleIds
 ) implements Serializable {
 

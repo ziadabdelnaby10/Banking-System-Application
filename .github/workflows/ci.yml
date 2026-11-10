@@ -25,10 +25,12 @@ jobs:
       matrix:
         module:
           - CommonsDTO
+          - CommonSecurity
           - Config
           - Discovery
           - Gateway
           - Identity
+          - Customer
 
     services:
       postgres:
