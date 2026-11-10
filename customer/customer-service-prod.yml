@@ -16,6 +16,17 @@ spring:
   config:
     # Also allow local .env-based overrides when running outside containers.
     import: optional:file:.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5434}/${POSTGRES_DB:bank_customer}
+    username: ${POSTGRES_USER:user}
+    password: ${POSTGRES_PASSWORD:rootroot}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      idle-timeout: 30000
+      max-lifetime: 1200000
+      connection-timeout: 20000
   flyway:
     baseline-on-migrate: true
     enabled: true
