@@ -29,6 +29,7 @@ spring:
             - "${CONFIG_GATEWAY_SEARCH_PATH:gateway}"
             - "${CONFIG_IDENTITY_SEARCH_PATH:identity}"
             - "${CONFIG_CUSTOMER_SEARCH_PATH:customer}"
+            - "${CONFIG_ACCOUNT_SEARCH_PATH:account}"
 #  profiles:
 #    active: ${SPRING_PROFILES_ACTIVE:dev}
 logging:

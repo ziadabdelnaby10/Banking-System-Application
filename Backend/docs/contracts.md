@@ -22,6 +22,12 @@
 - `MINOR`: additive backward-compatible fields/types
 - `PATCH`: docs and non-contract internal fixes
 
+## Account Contracts (since 1.1.0)
+- Enums: `AccountStatus` (with `canTransitionTo`), `AccountType`
+- Requests: `OpenAccountRequest`, `ChangeAccountStatusRequest` (mandatory `reason`), `ApplyBalanceSnapshotRequest` (Ledger to Account)
+- Responses: `AccountResponse`, `AccountSummaryResponse`, `AccountBalanceResponse`, `AccountProductResponse`, `AccountStatusHistoryResponse`
+- Money is `BigDecimal` with scale 2; currency is an uppercase ISO-4217 code
+
 ## Error Contract
 - Canonical payload: `ApiErrorDetail` (`timestamp`, `status`, `error`, `code`, `message`, `path`, `correlationId`, `violations[]`)
 - Field level validation: `violations` list of `FieldViolation(field, message)`
