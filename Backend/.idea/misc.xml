@@ -11,10 +11,11 @@
         <option value="$PROJECT_DIR$/Identity/pom.xml" />
         <option value="$PROJECT_DIR$/CommonSecurity/pom.xml" />
         <option value="$PROJECT_DIR$/Customer/pom.xml" />
+        <option value="$PROJECT_DIR$/Account/pom.xml" />
       </list>
     </option>
   </component>
-  <component name="ProjectRootManager" version="2" languageLevel="JDK_21" project-jdk-name="24" project-jdk-type="JavaSDK">
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_21" project-jdk-name="21" project-jdk-type="JavaSDK">
     <output url="file://$PROJECT_DIR$/out" />
   </component>
 </project>

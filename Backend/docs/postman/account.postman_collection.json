@@ -1,0 +1,95 @@
+{
+  "info": {
+    "_postman_id": "3c6a1e52-9d47-4b0e-a1f3-7e2b5d8c4a91",
+    "name": "Banking System - Account (via Gateway)",
+    "description": "Account service endpoints (products, accounts, lifecycle), called through the API Gateway ({{baseUrl}}).\n\nQuick start:\n1. Import this collection and local.postman_environment.json, select the environment.\n2. Log in with the Identity collection (Auth > 1. Login). The accessToken it saves is reused here.\n3. Run Customer > Customers > Register customer (saves customerId), then Products > List products (saves productCode) and Accounts > Open account (saves accountId / accountNo).\n4. Lifecycle calls (freeze / unfreeze / close) need ACCOUNT_STATUS_CHANGE: log in as manager1 or admin (MFA) first. Closing needs a zero balance (balances are a read-only Ledger snapshot).\n\nBranch scoping: tellers/managers only see and change accounts in their own branch (out-of-branch accounts return 404). ADMIN and AUDITOR are not branch-restricted.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [ { "key": "token", "value": "{{accessToken}}", "type": "string" } ]
+  },
+  "item": [
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "List products (ACCOUNT_VIEW)",
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "if (pm.response.code === 200) { const products = pm.response.json(); if (products.length) { pm.environment.set('productCode', products[0].code); } }"
+          ] } } ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/account-products" }
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "item": [
+        {
+          "name": "Open account (ACCOUNT_CREATE)",
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "if (pm.response.code === 201) { const a = pm.response.json(); pm.environment.set('accountId', a.id); pm.environment.set('accountNo', a.accountNo); }"
+          ] } } ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/accounts",
+            "body": { "mode": "raw", "raw": "{\n  \"customerId\": \"{{customerId}}\",\n  \"productCode\": \"{{productCode}}\",\n  \"currency\": \"EGP\",\n  \"branchCode\": \"{{branchCode}}\"\n}" }
+          }
+        },
+        {
+          "name": "Search accounts",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/v1/accounts?customerId={{customerId}}&page=0&size=20&sort=openedAt,desc", "host": ["{{baseUrl}}"], "path": ["api", "v1", "accounts"], "query": [ { "key": "customerId", "value": "{{customerId}}" }, { "key": "page", "value": "0" }, { "key": "size", "value": "20" }, { "key": "sort", "value": "openedAt,desc" } ] } }
+        },
+        {
+          "name": "Search accounts by number prefix",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/v1/accounts?accountNo={{accountNo}}&status=ACTIVE", "host": ["{{baseUrl}}"], "path": ["api", "v1", "accounts"], "query": [ { "key": "accountNo", "value": "{{accountNo}}" }, { "key": "status", "value": "ACTIVE" } ] } }
+        },
+        {
+          "name": "Get account",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/accounts/{{accountId}}" }
+        },
+        {
+          "name": "Get balance",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/accounts/{{accountId}}/balance" }
+        },
+        {
+          "name": "Status history",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/accounts/{{accountId}}/status-history" }
+        }
+      ]
+    },
+    {
+      "name": "Lifecycle (ACCOUNT_STATUS_CHANGE)",
+      "item": [
+        {
+          "name": "Freeze account",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{accountId}}/freeze",
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Suspicious activity under review\"\n}" }
+          }
+        },
+        {
+          "name": "Unfreeze account",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{accountId}}/unfreeze",
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Review cleared\"\n}" }
+          }
+        },
+        {
+          "name": "Close account (zero balance only)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/accounts/{{accountId}}/close",
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Closed at customer request\"\n}" }
+          }
+        }
+      ]
+    }
+  ]
+}
