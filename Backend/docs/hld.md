@@ -81,7 +81,7 @@ flowchart LR
 |---|---|
 | API Gateway | Auth enforcement, request routing, rate limiting, observability metadata |
 | Identity | JWT issuance, refresh, MFA, RBAC, session lifecycle |
-| Customer | KYC, customer profiles, branch assignment, customer lookups |
+| Customer | Branches, customer profiles (UUIDv7 ids, `branch_code` assignment), KYC with maker-checker, outbox events; see [Customer README](../Customer/README.md) |
 | Account | Account opening, balances, account status history, customer-account mapping |
 | Transaction | Payment/transfer request creation and validation |
 | Ledger | Double-entry journal posting and balance reconciliation |
@@ -92,10 +92,10 @@ flowchart LR
 
 ## 8. Core business flows
 ### Customer onboarding
-1. Customer record is created in Customer service
-2. Branch and compliance metadata are assigned
-3. KYC evidence and validations are stored
-4. Audit event is emitted for lifecycle tracking
+1. Customer record is created in Customer service (national id stored only as HMAC fingerprint + last 4)
+2. Branch assignment is validated against the caller's branch scope
+3. KYC evidence is submitted by one user and reviewed by a different user (maker-checker)
+4. Domain events are written to the outbox in the same transaction for audit and notifications
 
 ### Account opening
 1. Customer identity is validated

@@ -1,0 +1,118 @@
+{
+  "info": {
+    "_postman_id": "0b7d5a3e-5c1f-4c7e-8a52-3f9d6e1b2c44",
+    "name": "Banking System - Customer (via Gateway)",
+    "description": "Customer service endpoints (branches, customers, KYC), called through the API Gateway ({{baseUrl}}).\n\nQuick start:\n1. Import this collection and local.postman_environment.json, select the environment.\n2. Log in with the Identity collection (Auth > 1. Login). The accessToken variable it saves is reused here; the token is issued by Identity and validated by Customer through CommonSecurity (JWKS).\n3. Run Customers > Register customer; it saves customerId. Run KYC > Submit KYC; it saves kycRecordId.\n4. KYC review needs a DIFFERENT user than the submitter (maker-checker): log in as manager1 (MFA) in the Identity collection, then run KYC > Review KYC.\n\nBranch scoping: tellers/managers only see and change data in their own branch (out-of-branch resources return 404). ADMIN and AUDITOR are not branch-restricted.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [ { "key": "token", "value": "{{accessToken}}", "type": "string" } ]
+  },
+  "item": [
+    {
+      "name": "Branches",
+      "item": [
+        {
+          "name": "Create branch (BRANCH_MANAGE)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/branches",
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"BR003\",\n  \"name\": \"Alexandria Branch\",\n  \"region\": \"North\"\n}" }
+          }
+        },
+        {
+          "name": "List branches",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/v1/branches?page=0&size=20", "host": ["{{baseUrl}}"], "path": ["api", "v1", "branches"], "query": [ { "key": "page", "value": "0" }, { "key": "size", "value": "20" } ] } }
+        },
+        {
+          "name": "Get branch",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/branches/{{branchCode}}" }
+        },
+        {
+          "name": "Update branch (BRANCH_MANAGE)",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/branches/{{branchCode}}",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Cairo Main Branch\",\n  \"region\": \"Central\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "Register customer (CUSTOMER_CREATE)",
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "if (pm.response.code === 201) { pm.environment.set('customerId', pm.response.json().id); }"
+          ] } } ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/customers",
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Mona Hassan\",\n  \"dateOfBirth\": \"1990-05-14\",\n  \"nationalId\": \"{{$randomInt}}{{$randomInt}}{{$randomInt}}12345678\",\n  \"branchCode\": \"{{branchCode}}\"\n}" }
+          }
+        },
+        {
+          "name": "Search customers",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/v1/customers?name=Mona&page=0&size=20&sort=createdAt,desc", "host": ["{{baseUrl}}"], "path": ["api", "v1", "customers"], "query": [ { "key": "name", "value": "Mona" }, { "key": "page", "value": "0" }, { "key": "size", "value": "20" }, { "key": "sort", "value": "createdAt,desc" } ] } }
+        },
+        {
+          "name": "Get customer",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/customers/{{customerId}}" }
+        },
+        {
+          "name": "Update customer (CUSTOMER_UPDATE)",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/customers/{{customerId}}",
+            "body": { "mode": "raw", "raw": "{\n  \"fullName\": \"Mona Hassan Ali\",\n  \"riskLevel\": \"MEDIUM\"\n}" }
+          }
+        },
+        {
+          "name": "Change status (CUSTOMER_STATUS_CHANGE)",
+          "request": {
+            "method": "PATCH",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/customers/{{customerId}}/status",
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"BLOCKED\",\n  \"reason\": \"Suspicious activity review\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "KYC",
+      "item": [
+        {
+          "name": "Submit KYC (KYC_SUBMIT)",
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "if (pm.response.code === 201) { pm.environment.set('kycRecordId', pm.response.json().id); }"
+          ] } } ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/customers/{{customerId}}/kyc",
+            "body": { "mode": "raw", "raw": "{\n  \"documentType\": \"NATIONAL_ID\",\n  \"documentRef\": \"SCAN-0001\"\n}" }
+          }
+        },
+        {
+          "name": "List KYC records",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/customers/{{customerId}}/kyc" }
+        },
+        {
+          "name": "Review KYC (KYC_REVIEW, different user than submitter)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/customers/{{customerId}}/kyc/{{kycRecordId}}/review",
+            "body": { "mode": "raw", "raw": "{\n  \"decision\": \"APPROVED\",\n  \"notes\": \"Document matches\"\n}" }
+          }
+        }
+      ]
+    }
+  ]
+}

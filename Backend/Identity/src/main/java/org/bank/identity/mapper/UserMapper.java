@@ -20,6 +20,8 @@ import java.util.stream.Collectors;
 public interface UserMapper {
 
     @Mapping(target = "roles", source = "userRoles", qualifiedByName = "roleNames")
+    @Mapping(target = "createdAt", source = "createdAt")
+    @Mapping(target = "updatedAt", source = "updatedAt")
     UserResponse toResponse(User user);
 
     /**

@@ -11,31 +11,41 @@ spring:
   profiles:
     # Which profile is active: "dev" for local work (see application-dev.yml), "prod" by default.
     active: ${PROFILE:dev}
-  cloud:
-    gateway:
-      server:
-        webflux:
-          # ROUTES: which URL goes to which service. "lb://name" = look the service up in Eureka.
-          # To add a service: add its API route here, one docs route, and one springdoc.swagger-ui.urls entry below.
-          routes:
-            - id: identity-api
-              uri: lb://identity-service
-              predicates:
-                - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/admin/**,/.well-known/jwks.json
-            # Swagger: /docs/<service>/v3/api-docs is forwarded to <service>/v3/api-docs
-            - id: identity-docs
-              uri: lb://identity-service
-              predicates:
-                - Path=/docs/identity/v3/api-docs/**
-              filters:
-                - RewritePath=/docs/identity/(?<segment>.*), /$\{segment}
-            # Opening http://localhost:9000/ lands on the Swagger page.
-            - id: root-to-swagger
-              uri: no://op
-              predicates:
-                - Path=/
-              filters:
-                - RedirectTo=302, /swagger-ui.html
+#  cloud:
+#    gateway:
+#      server:
+#        webflux:
+#          # ROUTES: which URL goes to which service. "lb://name" = look the service up in Eureka.
+#          # To add a service: add its API route here, one docs route, and one springdoc.swagger-ui.urls entry below.
+#          routes:
+#            - id: identity-api
+#              uri: lb://identity-service
+#              predicates:
+#                - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/admin/**,/.well-known/jwks.json
+#            # Swagger: /docs/<service>/v3/api-docs is forwarded to <service>/v3/api-docs
+#            - id: identity-docs
+#              uri: lb://identity-service
+#              predicates:
+#                - Path=/docs/identity/v3/api-docs/**
+#              filters:
+#                - RewritePath=/docs/identity/(?<segment>.*), /$\{segment}
+#            - id: customer-api
+#              uri: lb://customer-service
+#              predicates:
+#                - Path=/api/v1/branches/**,/api/v1/customers/**
+#            - id: customer-docs
+#              uri: lb://customer-service
+#              predicates:
+#                - Path=/docs/customer/v3/api-docs/**
+#              filters:
+#                - RewritePath=/docs/customer/(?<segment>.*), /$\{segment}
+#            # Opening http://localhost:9000/ lands on the Swagger page.
+#            - id: root-to-swagger
+#              uri: no://op
+#              predicates:
+#                - Path=/
+#              filters:
+#                - RedirectTo=302, /swagger-ui.html
 #bank:
 #  security:
 #    enabled: false
@@ -53,37 +63,39 @@ spring:
 #    jwt:
 #      issuer: ${IDENTITY_JWT_ISSUER:http://localhost:9000}
 #      jwk-set-uri: ${IDENTITY_JWK_SET_URI:http://localhost:9001/.well-known/jwks.json}
-bank:
-  security:
-    # Endpoints reachable without a bearer token (production list: no Swagger). Everything else needs a token.
-    # application-dev.yml repeats this list plus the Swagger paths.
-    public-paths:
-      - /actuator/health/**
-      - /actuator/info
-      - /.well-known/jwks.json
-      - /api/v1/auth/login
-      - /api/v1/auth/mfa/verify
-      - /api/v1/auth/refresh
-      - /api/v1/auth/logout
-
-# SWAGGER UI (central API documentation page)
-# The Gateway has no endpoints of its own, so its own /v3/api-docs is off. The page shows a dropdown with
-# one entry per microservice; each document is loaded through the Gateway. Switched off in application-prod.yml.
-springdoc:
-  enable-default-api-docs: false
-  swagger-ui:
-    path: /swagger-ui.html
-    disable-swagger-default-url: true
-    urls:
-      - name: identity-service
-        url: /docs/identity/v3/api-docs
-    urls-primary-name: identity-service
-    persist-authorization: true
-    tags-sorter: alpha
-    operations-sorter: alpha
-logging:
-  level:
-    org:
-      springframework:
-        security:
-          web: DEBUG
+#bank:
+#  security:
+#    # Endpoints reachable without a bearer token (production list: no Swagger). Everything else needs a token.
+#    # application-dev.yml repeats this list plus the Swagger paths.
+#    public-paths:
+#      - /actuator/health/**
+#      - /actuator/info
+#      - /.well-known/jwks.json
+#      - /api/v1/auth/login
+#      - /api/v1/auth/mfa/verify
+#      - /api/v1/auth/refresh
+#      - /api/v1/auth/logout
+#
+## SWAGGER UI (central API documentation page)
+## The Gateway has no endpoints of its own, so its own /v3/api-docs is off. The page shows a dropdown with
+## one entry per microservice; each document is loaded through the Gateway. Switched off in application-prod.yml.
+#springdoc:
+#  enable-default-api-docs: false
+#  swagger-ui:
+#    path: /swagger-ui.html
+#    disable-swagger-default-url: true
+#    urls:
+#      - name: identity-service
+#        url: /docs/identity/v3/api-docs
+#      - name: customer-service
+#        url: /docs/customer/v3/api-docs
+#    urls-primary-name: identity-service
+#    persist-authorization: true
+#    tags-sorter: alpha
+#    operations-sorter: alpha
+#logging:
+#  level:
+#    org:
+#      springframework:
+#        security:
+#          web: DEBUG
