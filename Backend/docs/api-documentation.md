@@ -3,7 +3,7 @@
 ## Swagger UI (central page on the Gateway)
 
 Start Config, Discovery, Identity and Gateway, then open **http://localhost:9000/** (redirects to `/swagger-ui.html`).
-The top-right dropdown lists one entry per microservice (currently `identity-service` and `customer-service`). Each OpenAPI document is
+The top-right dropdown lists one entry per microservice (currently `identity-service`, `customer-service` and `account-service`). Each OpenAPI document is
 loaded **through the Gateway** (`/docs/<service>/v3/api-docs`), and "Try it out" calls go through the Gateway too.
 
 To call protected endpoints: run `POST /api/v1/auth/login` in the page, copy `tokens.accessToken`, click **Authorize**
@@ -79,9 +79,12 @@ Files in [postman/](postman/):
   token as Bearer.
 - `customer.postman_collection.json` - Branches, Customers, KYC. Reuses the `accessToken` saved by the Identity login and
   saves `customerId` / `kycRecordId`. KYC review must be run with a different user than the submitter (maker-checker).
+- `account.postman_collection.json` - Products, Accounts (open, search, get, balance), Lifecycle (freeze, unfreeze, close,
+  status history). Reuses `accessToken` and `customerId`; saves `accountId` / `accountNo`. Status changes need a MANAGER or
+  ADMIN user (ACCOUNT_STATUS_CHANGE).
 - `local.postman_environment.json` - `baseUrl` = `http://localhost:9000` (the Gateway), seed users and passwords.
 
-Steps: Import both files, select the **Banking System - Local (Gateway)** environment, run **Auth > 1. Login**, then use any
+Steps: Import the collections, select the **Banking System - Local (Gateway)** environment, run **Auth > 1. Login**, then use any
 request. For `admin` / `manager1` / `auditor1` use **Auth > 2** then **3** (the MFA code is printed in the Identity log
 in dev, `[DEV ONLY]`; put it into the `mfaCode` environment variable).
 
