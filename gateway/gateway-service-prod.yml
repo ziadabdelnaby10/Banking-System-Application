@@ -19,13 +19,29 @@ spring:
               uri: lb://identity-service
               predicates:
                 - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/admin/**,/.well-known/jwks.json
+            - id: customer-service
+              uri: lb://customer-service
+              predicates:
+                - Path=/api/v1/branches/**,/api/v1/customers/**
+            - id: account-service
+              uri: lb://account-service
+              predicates:
+                - Path=/api/v1/accounts/**,/api/v1/account-products/**
+            - id: ledger-service
+              uri: lb://ledger-service
+              predicates:
+                - Path=/api/v1/ledger/**
+            - id: transaction-service
+              uri: lb://transaction-service
+              predicates:
+                - Path=/api/v1/transactions/**
           # CORS = which websites (origins) a browser is allowed to call this API from.
           globalcors:
             cors-configurations:
               '[/**]':
                 allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
                 allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
-                allowed-headers: Authorization,Content-Type,X-Correlation-Id
+                allowed-headers: Authorization,Content-Type,X-Correlation-Id,Idempotency-Key
                 exposed-headers: X-Correlation-Id,Retry-After
                 # Bearer tokens travel in a header, never in cookies.
                 allow-credentials: false
@@ -55,7 +71,7 @@ bank:
       - /api/v1/auth/logout
     jwt:
       # Only tokens issued by this "issuer" (Identity's address) are accepted.
-      issuer: ${IDENTITY_JWT_ISSUER:}
+      issuer: ${IDENTITY_JWT_ISSUER}
 
 
 logging:
