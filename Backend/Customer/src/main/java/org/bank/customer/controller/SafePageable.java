@@ -32,6 +32,7 @@ final class SafePageable {
             }
         }
         Sort stable = requested.getOrderFor(TIE_BREAKER) == null ? requested.and(Sort.by(TIE_BREAKER)) : requested;
-        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), stable);
+        int pageSize = Math.min(pageable.getPageSize(), 100);
+        return PageRequest.of(pageable.getPageNumber(), pageSize, stable);
     }
 }

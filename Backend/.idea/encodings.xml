@@ -9,5 +9,6 @@
     <file url="file://$PROJECT_DIR$/Discovery/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Gateway/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/Identity/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/Ledger/src/main/java" charset="UTF-8" />
   </component>
 </project>

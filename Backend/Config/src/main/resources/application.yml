@@ -30,6 +30,7 @@ spring:
             - "${CONFIG_IDENTITY_SEARCH_PATH:identity}"
             - "${CONFIG_CUSTOMER_SEARCH_PATH:customer}"
             - "${CONFIG_ACCOUNT_SEARCH_PATH:account}"
+            - "${CONFIG_LEDGER_SEARCH_PATH:ledger}"
 #  profiles:
 #    active: ${SPRING_PROFILES_ACTIVE:dev}
 logging:

@@ -1,0 +1,221 @@
+{
+  "info": {
+    "_postman_id": "7d2f9b84-5e13-4c6a-9a08-1b4e6c3d8f25",
+    "name": "Banking System - Ledger (via Gateway)",
+    "description": "Ledger service endpoints (double-entry journal, balances, statements, reconciliation), called through the API Gateway ({{baseUrl}}).\n\nQuick start:\n1. Import this collection and local.postman_environment.json, select the environment.\n2. Log in with the Identity collection (Auth > 1. Login) as manager1 or admin (MFA): posting needs LEDGER_POST (ADMIN / MANAGER). Tellers only have LEDGER_VIEW, auditors LEDGER_VIEW + LEDGER_RECONCILE.\n3. Optionally run Account > Accounts > Open account first: its accountId is reused as the customer's ledger account. Otherwise a random UUID is generated and saved as ledgerAccountId.\n4. Run the folders in order: Postings (fund the account, withdraw), Queries (batch, statement, balance, reconciliation), then Idempotency and Rejected requests.\n\nConventions: CREDIT adds to an account balance, DEBIT subtracts. Every batch must balance (debits = credits per currency). Customer accounts can never go negative; the bank-owned cash account {{cashAccountId}} is a configured system account (bank.ledger.system-accounts) and may. Balances are created by the first posting to an account.\n\nCollection variables (override in the environment if needed): cashAccountId, currency.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [ { "key": "token", "value": "{{accessToken}}", "type": "string" } ]
+  },
+  "variable": [
+    { "key": "cashAccountId", "value": "00000000-0000-7000-8000-000000000001", "type": "string" },
+    { "key": "currency", "value": "EGP", "type": "string" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": { "type": "text/javascript", "exec": [
+        "// The customer-side ledger account: reuse the Account collection's accountId, else invent one (UUID shape is all the Ledger needs).",
+        "if (!pm.environment.get('ledgerAccountId')) {",
+        "  pm.environment.set('ledgerAccountId', pm.environment.get('accountId') || pm.variables.replaceIn('{{$guid}}'));",
+        "}"
+      ] }
+    }
+  ],
+  "item": [
+    {
+      "name": "Postings (LEDGER_POST)",
+      "item": [
+        {
+          "name": "1. Deposit 100.00 (cash DEBIT / customer CREDIT)",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "pm.environment.set('batchRef', 'PM-DEP-' + Date.now());"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Posted (201)', () => pm.response.to.have.status(201));",
+              "const b = pm.response.json();",
+              "pm.test('Batch is POSTED with 2 entries', () => { pm.expect(b.status).to.eql('POSTED'); pm.expect(b.entries.length).to.eql(2); });",
+              "pm.test('Location header points at the batch', () => pm.expect(pm.response.headers.get('Location')).to.include('/api/v1/ledger/journal-batches/' + b.id));",
+              "pm.environment.set('batchId', b.id);"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/ledger/journal-batches",
+            "body": { "mode": "raw", "raw": "{\n  \"batchRef\": \"{{batchRef}}\",\n  \"sourceService\": \"postman\",\n  \"sourceEvent\": \"cash.deposit\",\n  \"entries\": [\n    { \"accountId\": \"{{cashAccountId}}\", \"entryType\": \"DEBIT\", \"amount\": 100.00, \"currency\": \"{{currency}}\", \"reference\": \"Teller cash in\" },\n    { \"accountId\": \"{{ledgerAccountId}}\", \"entryType\": \"CREDIT\", \"amount\": 100.00, \"currency\": \"{{currency}}\", \"reference\": \"Cash deposit\" }\n  ]\n}" }
+          }
+        },
+        {
+          "name": "2. Withdraw 30.00 (customer DEBIT / cash CREDIT)",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "pm.environment.set('withdrawalRef', 'PM-WDR-' + Date.now());"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Posted (201)', () => pm.response.to.have.status(201));"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/ledger/journal-batches",
+            "body": { "mode": "raw", "raw": "{\n  \"batchRef\": \"{{withdrawalRef}}\",\n  \"sourceService\": \"postman\",\n  \"sourceEvent\": \"cash.withdrawal\",\n  \"entries\": [\n    { \"accountId\": \"{{ledgerAccountId}}\", \"entryType\": \"DEBIT\", \"amount\": 30.00, \"currency\": \"{{currency}}\", \"reference\": \"Cash withdrawal\" },\n    { \"accountId\": \"{{cashAccountId}}\", \"entryType\": \"CREDIT\", \"amount\": 30.00, \"currency\": \"{{currency}}\", \"reference\": \"Teller cash out\" }\n  ]\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Queries (LEDGER_VIEW)",
+      "item": [
+        {
+          "name": "Get journal batch",
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Found (200)', () => pm.response.to.have.status(200));",
+            "pm.test('Entries are in line order', () => { const e = pm.response.json().entries; pm.expect(e.map(x => x.lineNo)).to.eql(e.map((x, i) => i + 1)); });"
+          ] } } ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/ledger/journal-batches/{{batchId}}" }
+        },
+        {
+          "name": "Get balance",
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Found (200)', () => pm.response.to.have.status(200));",
+            "const b = pm.response.json();",
+            "pm.test('Customer account, balance never negative', () => { pm.expect(b.accountKind).to.eql('CUSTOMER'); pm.expect(b.ledgerBalance).to.be.at.least(0); });"
+          ] } } ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/ledger/accounts/{{ledgerAccountId}}/balance" }
+        },
+        {
+          "name": "Get balance - bank cash (system) account",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/ledger/accounts/{{cashAccountId}}/balance" }
+        },
+        {
+          "name": "Account statement (newest first)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/v1/ledger/accounts/{{ledgerAccountId}}/entries?page=0&size=20", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ledger", "accounts", "{{ledgerAccountId}}", "entries"], "query": [ { "key": "page", "value": "0" }, { "key": "size", "value": "20" } ] } }
+        },
+        {
+          "name": "Account statement - credits only, by amount",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/v1/ledger/accounts/{{ledgerAccountId}}/entries?entryType=CREDIT&sort=amount,desc&page=0&size=20", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ledger", "accounts", "{{ledgerAccountId}}", "entries"], "query": [ { "key": "entryType", "value": "CREDIT" }, { "key": "sort", "value": "amount,desc" }, { "key": "page", "value": "0" }, { "key": "size", "value": "20" } ] } }
+        },
+        {
+          "name": "Account statement - date range",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/v1/ledger/accounts/{{ledgerAccountId}}/entries?from=2026-01-01T00:00:00Z&to=2999-01-01T00:00:00Z", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ledger", "accounts", "{{ledgerAccountId}}", "entries"], "query": [ { "key": "from", "value": "2026-01-01T00:00:00Z" }, { "key": "to", "value": "2999-01-01T00:00:00Z" } ] } }
+        }
+      ]
+    },
+    {
+      "name": "Reconciliation (LEDGER_RECONCILE)",
+      "item": [
+        {
+          "name": "Reconcile account (stored vs recomputed balance)",
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Found (200)', () => pm.response.to.have.status(200));",
+            "pm.test('Stored balance equals the sum of the journal', () => { const r = pm.response.json(); pm.expect(r.consistent).to.eql(true); pm.expect(r.discrepancy).to.eql(0); });"
+          ] } } ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/ledger/accounts/{{ledgerAccountId}}/reconciliation" }
+        }
+      ]
+    },
+    {
+      "name": "Idempotency",
+      "item": [
+        {
+          "name": "Replay the deposit (same batchRef, same content) - 200",
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Replay answers 200, not 201', () => pm.response.to.have.status(200));",
+            "pm.test('Returns the original batch', () => pm.expect(pm.response.json().id).to.eql(pm.environment.get('batchId')));"
+          ] } } ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/ledger/journal-batches",
+            "body": { "mode": "raw", "raw": "{\n  \"batchRef\": \"{{batchRef}}\",\n  \"sourceService\": \"postman\",\n  \"sourceEvent\": \"cash.deposit\",\n  \"entries\": [\n    { \"accountId\": \"{{cashAccountId}}\", \"entryType\": \"DEBIT\", \"amount\": 100.00, \"currency\": \"{{currency}}\", \"reference\": \"Teller cash in\" },\n    { \"accountId\": \"{{ledgerAccountId}}\", \"entryType\": \"CREDIT\", \"amount\": 100.00, \"currency\": \"{{currency}}\", \"reference\": \"Cash deposit\" }\n  ]\n}" }
+          }
+        },
+        {
+          "name": "Reuse the batchRef with different content - 409",
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Conflict (409)', () => pm.response.to.have.status(409));",
+            "pm.test('DUPLICATE_RESOURCE', () => pm.expect(pm.response.json().code).to.eql('DUPLICATE_RESOURCE'));"
+          ] } } ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/ledger/journal-batches",
+            "body": { "mode": "raw", "raw": "{\n  \"batchRef\": \"{{batchRef}}\",\n  \"sourceService\": \"postman\",\n  \"sourceEvent\": \"cash.deposit\",\n  \"entries\": [\n    { \"accountId\": \"{{cashAccountId}}\", \"entryType\": \"DEBIT\", \"amount\": 101.00, \"currency\": \"{{currency}}\" },\n    { \"accountId\": \"{{ledgerAccountId}}\", \"entryType\": \"CREDIT\", \"amount\": 101.00, \"currency\": \"{{currency}}\" }\n  ]\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rejected requests (expected errors)",
+      "item": [
+        {
+          "name": "Unbalanced batch - 422",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [ "pm.environment.set('rejectRef', 'PM-BAD-' + Date.now());" ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Rejected (422)', () => pm.response.to.have.status(422));",
+              "pm.test('BUSINESS_RULE_VIOLATION', () => pm.expect(pm.response.json().code).to.eql('BUSINESS_RULE_VIOLATION'));"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/ledger/journal-batches",
+            "body": { "mode": "raw", "raw": "{\n  \"batchRef\": \"{{rejectRef}}\",\n  \"sourceService\": \"postman\",\n  \"sourceEvent\": \"demo.unbalanced\",\n  \"entries\": [\n    { \"accountId\": \"{{cashAccountId}}\", \"entryType\": \"DEBIT\", \"amount\": 100.00, \"currency\": \"{{currency}}\" },\n    { \"accountId\": \"{{ledgerAccountId}}\", \"entryType\": \"CREDIT\", \"amount\": 99.00, \"currency\": \"{{currency}}\" }\n  ]\n}" }
+          }
+        },
+        {
+          "name": "Overdraft (insufficient funds) - 422",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [ "pm.environment.set('rejectRef', 'PM-OD-' + Date.now());" ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Rejected (422)', () => pm.response.to.have.status(422));",
+              "pm.test('Mentions insufficient funds', () => pm.expect(pm.response.json().message).to.include('Insufficient funds'));"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/ledger/journal-batches",
+            "body": { "mode": "raw", "raw": "{\n  \"batchRef\": \"{{rejectRef}}\",\n  \"sourceService\": \"postman\",\n  \"sourceEvent\": \"demo.overdraft\",\n  \"entries\": [\n    { \"accountId\": \"{{ledgerAccountId}}\", \"entryType\": \"DEBIT\", \"amount\": 1000000.00, \"currency\": \"{{currency}}\" },\n    { \"accountId\": \"{{cashAccountId}}\", \"entryType\": \"CREDIT\", \"amount\": 1000000.00, \"currency\": \"{{currency}}\" }\n  ]\n}" }
+          }
+        },
+        {
+          "name": "Validation failure (single entry, 3 decimals) - 422",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [ "pm.environment.set('rejectRef', 'PM-VAL-' + Date.now());" ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Rejected (422)', () => pm.response.to.have.status(422));",
+              "pm.test('VALIDATION_FAILED', () => pm.expect(pm.response.json().code).to.eql('VALIDATION_FAILED'));"
+            ] } }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": "{{baseUrl}}/api/v1/ledger/journal-batches",
+            "body": { "mode": "raw", "raw": "{\n  \"batchRef\": \"{{rejectRef}}\",\n  \"sourceService\": \"postman\",\n  \"sourceEvent\": \"demo.invalid\",\n  \"entries\": [\n    { \"accountId\": \"{{ledgerAccountId}}\", \"entryType\": \"CREDIT\", \"amount\": 1.001, \"currency\": \"{{currency}}\" }\n  ]\n}" }
+          }
+        },
+        {
+          "name": "Unknown account balance - 404",
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Not found (404)', () => pm.response.to.have.status(404));"
+          ] } } ],
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/ledger/accounts/{{$guid}}/balance" }
+        },
+        {
+          "name": "Unsupported sort property - 400",
+          "event": [ { "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Bad request (400)', () => pm.response.to.have.status(400));"
+          ] } } ],
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/v1/ledger/accounts/{{ledgerAccountId}}/entries?sort=accountId", "host": ["{{baseUrl}}"], "path": ["api", "v1", "ledger", "accounts", "{{ledgerAccountId}}", "entries"], "query": [ { "key": "sort", "value": "accountId" } ] } }
+        }
+      ]
+    }
+  ]
+}
