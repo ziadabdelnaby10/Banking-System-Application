@@ -78,12 +78,12 @@ bank:
     clients:
       # Service names resolved through Eureka. Set load-balanced=false and a full URL to call a fixed host.
       ledger:
-        base-url: ${LEDGER_SERVICE_URL:http://ledger-service}
+        base-url: ${LEDGER_SERVICE_URL:lb://ledger-service}
         load-balanced: ${LEDGER_SERVICE_LOAD_BALANCED:true}
         connect-timeout: 2s
         read-timeout: 5s
       account:
-        base-url: ${ACCOUNT_SERVICE_URL:http://account-service}
+        base-url: ${ACCOUNT_SERVICE_URL:lb://account-service}
         load-balanced: ${ACCOUNT_SERVICE_LOAD_BALANCED:true}
         connect-timeout: 2s
         read-timeout: 5s
