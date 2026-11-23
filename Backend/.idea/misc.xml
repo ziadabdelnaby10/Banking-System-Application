@@ -12,6 +12,7 @@
         <option value="$PROJECT_DIR$/CommonSecurity/pom.xml" />
         <option value="$PROJECT_DIR$/Customer/pom.xml" />
         <option value="$PROJECT_DIR$/Account/pom.xml" />
+        <option value="$PROJECT_DIR$/Ledger/pom.xml" />
       </list>
     </option>
   </component>

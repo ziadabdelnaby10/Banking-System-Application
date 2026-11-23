@@ -3,7 +3,7 @@
 ## Swagger UI (central page on the Gateway)
 
 Start Config, Discovery, Identity and Gateway, then open **http://localhost:9000/** (redirects to `/swagger-ui.html`).
-The top-right dropdown lists one entry per microservice (currently `identity-service`, `customer-service` and `account-service`). Each OpenAPI document is
+The top-right dropdown lists one entry per microservice (currently `identity-service`, `customer-service`, `account-service` and `ledger-service`). Each OpenAPI document is
 loaded **through the Gateway** (`/docs/<service>/v3/api-docs`), and "Try it out" calls go through the Gateway too.
 
 To call protected endpoints: run `POST /api/v1/auth/login` in the page, copy `tokens.accessToken`, click **Authorize**

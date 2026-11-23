@@ -30,8 +30,9 @@ jobs:
           - Discovery
           - Gateway
           - Identity
-          - Customer
+          #- Customer
           - Account
+          - Ledger
 
     services:
       postgres:
@@ -81,14 +82,14 @@ jobs:
       # Shared libraries are internal artifacts (not on Maven Central), so they must be
       # installed into the runner's local repository before dependent modules resolve them.
       - name: Install CommonsDTO (shared library)
-        if: contains(fromJSON('["CommonSecurity","Gateway","Identity","Customer","Account"]'), matrix.module)
+        if: contains(fromJSON('["CommonSecurity","Gateway","Identity","Customer","Account","Ledger"]'), matrix.module)
         working-directory: Backend/CommonsDTO
         run: |
           chmod +x ./mvnw
           ./mvnw -B -ntp -DskipTests install
 
       - name: Install CommonSecurity (shared library)
-        if: contains(fromJSON('["Gateway","Identity","Customer","Account"]'), matrix.module)
+        if: contains(fromJSON('["Gateway","Identity","Customer","Account","Ledger"]'), matrix.module)
         working-directory: Backend/CommonSecurity
         run: |
           chmod +x ./mvnw
