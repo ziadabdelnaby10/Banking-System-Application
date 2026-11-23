@@ -1,0 +1,37 @@
+spring:
+  cloud:
+    config:
+      enabled: false
+  jpa:
+    properties:
+      hibernate:
+        # Lets the query-count tests prove the absence of N+1 selects.
+        generate_statistics: true
+        jdbc:
+          time_zone: UTC
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+    open-in-view: false
+  cache:
+    type: caffeine
+    cache-names: account-products
+    caffeine:
+      spec: maximumSize=10,expireAfterWrite=60s
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+bank:
+  security:
+    branch-bypass-roles: ADMIN,AUDITOR
+    jwt:
+      issuer: http://localhost:9000
+      # The real URI (a local JWKS server standing in for Identity) is set by the tests.
+      jwk-set-uri: http://localhost:0/.well-known/jwks.json

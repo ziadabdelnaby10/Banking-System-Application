@@ -1,0 +1,14 @@
+/Backend/Banking-System-Application-config/application.yml
+/Backend/Banking-System-Application-config/customer/customer-service.yml
+/Backend/Banking-System-Application-config/customer/customer-service-dev.yml
+/Backend/Banking-System-Application-config/customer/customer-service-prod.yml
+/Backend/Banking-System-Application-config/discovery/discovery-service.yml
+/Backend/Banking-System-Application-config/discovery/discovery-service-dev.yml
+/Backend/Banking-System-Application-config/discovery/discovery-service-prod.yml
+/Backend/Banking-System-Application-config/gateway/gateway-service.yml
+/Backend/Banking-System-Application-config/gateway/gateway-service-dev.yml
+/Backend/Banking-System-Application-config/gateway/gateway-service-prod.yml
+/Backend/Banking-System-Application-config/identity/identity-service.yml
+/Backend/Banking-System-Application-config/identity/identity-service-dev.yml
+/Backend/Banking-System-Application-config/identity/identity-service-prod.yml
+/Backend/Banking-System-Application-config/README.md

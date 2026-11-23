@@ -211,7 +211,7 @@ class IdentityApiIntegrationTest {
 
         mvc.perform(post("/api/v1/users").header(HttpHeaders.AUTHORIZATION, "Bearer " + teller)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createUserJson("sneaky", "sneaky@bank.test", "BR-01", "[]")))
+                        .content(createUserJson("sneaky", "sneaky@bank.test", "BR-01", "[1]")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
@@ -241,7 +241,7 @@ class IdentityApiIntegrationTest {
         // Duplicate username (different case) must conflict.
         mvc.perform(post("/api/v1/users").header(HttpHeaders.AUTHORIZATION, bearer)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createUserJson("NEWTELLER", "other@bank.test", "BR-01", "[]")))
+                        .content(createUserJson("NEWTELLER", "other@bank.test", "BR-01", "[" + tellerRoleId + "]")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("DUPLICATE_RESOURCE"));
 

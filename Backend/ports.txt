@@ -3,3 +3,4 @@ discovery-service=8761
 gateway-service=9000
 identity-service=9001
 customer-service=9002
+account-service=9003

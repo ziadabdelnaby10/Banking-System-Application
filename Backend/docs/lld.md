@@ -90,17 +90,23 @@ Core entities:
 - AccountProduct
 - AccountStatusHistory
 
-Key APIs:
-- `POST /api/v1/accounts`
+Key APIs (port 9003, see [Account README](../Account/README.md)):
+- `POST /api/v1/accounts`, `GET /api/v1/accounts` (filters, branch scoped)
 - `GET /api/v1/accounts/{id}`
 - `GET /api/v1/accounts/{id}/balance`
-- `POST /api/v1/accounts/{id}/freeze`
-- `POST /api/v1/accounts/{id}/unfreeze`
+- `GET /api/v1/accounts/{id}/status-history`
+- `POST /api/v1/accounts/{id}/freeze`, `/unfreeze`, `/close` (mandatory `reason`)
+- `GET /api/v1/account-products`
 
 Rules:
-- Account numbers are unique
-- Balance mutation is only allowed through valid ledger posting events
-- Account freeze/unfreeze triggers approval if policy requires it
+- Account numbers are unique (`ACC` + 12 digits from a DB sequence)
+- Balances held here are a read-only snapshot of the Ledger. They change only through the internal
+  `AccountService.applyBalanceSnapshot` (version guarded, stale snapshots ignored); there is no REST write
+- Lifecycle: `ACTIVE -> FROZEN -> ACTIVE`, `ACTIVE|FROZEN -> CLOSED` (terminal, only with a zero balance).
+  `PENDING` is reserved for the Approval flow
+- Freeze/unfreeze/close apply directly today and record history + an outbox event; the approval hook is a seam in
+  `AccountServiceImpl.changeStatus`, to be routed through the Approval service when it exists
+- Customer and branch are trusted from the request (branch-scoped by `@branchAccess`); no call to Customer yet
 
 ### 2.5 Transaction Service
 Responsibilities:
@@ -260,9 +266,10 @@ Financial APIs must support idempotency keys to prevent duplicate processing dur
 - kyc_records: id, customer_id, type, evidence_ref, status, reviewed_by
 
 ### Account
-- accounts: id, account_no, customer_id, product_id, status, currency, balance
-- account_products: id, code, name, min_balance, allowed_features
-- account_status_history: id, account_id, previous_status, new_status, changed_by, changed_at
+- accounts: id, account_no, customer_id, branch_code, product_id, status, currency, ledger_balance, available_balance, balance_version, balance_as_of, opened_at, closed_at, audit columns, version
+- account_products: id, code, name, account_type, min_balance, active
+- account_status_history: id, account_id, previous_status, new_status, reason, changed_by, changed_at
+- outbox_events (account): aggregate_id, event_type (`account.opened`, `account.status-changed`), payload
 
 ### Transaction
 - payment_requests: id, request_ref, from_account_id, to_account_id, amount, currency, status, idempotency_key

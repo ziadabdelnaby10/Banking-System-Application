@@ -13,7 +13,7 @@
         <module name="Gateway" />
         <module name="dto" />
       </profile>
-      <profile name="Annotation profile for Identity" enabled="true">
+      <profile name="Annotation profile for Account" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
@@ -24,12 +24,14 @@
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok-mapstruct-binding/0.2.0/lombok-mapstruct-binding-0.2.0.jar" />
         </processorPath>
         <module name="Identity" />
+        <module name="Account" />
         <module name="Customer" />
       </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="Account" options="-parameters" />
       <module name="Config" options="-parameters" />
       <module name="Customer" options="-parameters" />
       <module name="Discovery" options="-parameters" />
