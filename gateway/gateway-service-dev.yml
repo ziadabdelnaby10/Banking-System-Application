@@ -35,6 +35,36 @@ spring:
                 - Path=/docs/customer/v3/api-docs/**
               filters:
                 - RewritePath=/docs/customer/(?<segment>.*), /$\{segment}
+                        - id: account-api
+              uri: lb://account-service
+              predicates:
+                - Path=/api/v1/accounts/**,/api/v1/account-products/**
+            - id: account-docs
+              uri: lb://account-service
+              predicates:
+                - Path=/docs/account/v3/api-docs/**
+              filters:
+                - RewritePath=/docs/account/(?<segment>.*), /$\{segment}
+            - id: ledger-api
+              uri: lb://ledger-service
+              predicates:
+                - Path=/api/v1/ledger/**
+            - id: ledger-docs
+              uri: lb://ledger-service
+              predicates:
+                - Path=/docs/ledger/v3/api-docs/**
+              filters:
+                - RewritePath=/docs/ledger/(?<segment>.*), /$\{segment}
+            - id: transaction-api
+              uri: lb://transaction-service
+              predicates:
+                - Path=/api/v1/transactions/**
+            - id: transaction-docs
+              uri: lb://transaction-service
+              predicates:
+                - Path=/docs/transaction/v3/api-docs/**
+              filters:
+                - RewritePath=/docs/transaction/(?<segment>.*), /$\{segment}
             # Opening http://localhost:9000/ lands on the Swagger page.
             - id: root-to-swagger
               uri: no://op
@@ -98,6 +128,12 @@ springdoc:
         url: /docs/identity/v3/api-docs
       - name: customer-service
         url: /docs/customer/v3/api-docs
+      - name: account-service
+        url: /docs/account/v3/api-docs
+      - name: ledger-service
+        url: /docs/ledger/v3/api-docs
+      - name: transaction-service
+        url: /docs/transaction/v3/api-docs
     urls-primary-name: identity-service
     persist-authorization: true
     tags-sorter: alpha
